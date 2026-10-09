@@ -1,7 +1,6 @@
 package rcservice
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -10,10 +9,6 @@ import (
 )
 
 func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
-	if dryRun {
-		return errors.New("dry run isn't ready yet")
-	}
-
 	repo, err := s.checkRepo(repo)
 	if err != nil {
 		return err
@@ -34,22 +29,32 @@ func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
 		return fmt.Errorf("can't find claude: %w", err)
 	}
 
-	if err := os.MkdirAll(s.UnitDir, 0o755); err != nil {
-		return fmt.Errorf("create %q: %w", s.UnitDir, err)
-	}
-	if err := os.WriteFile(unitPath, []byte(unitFile(repo, name, claude)), 0o644); err != nil {
-		return fmt.Errorf("write %q: %w", unitPath, err)
+	content := unitFile(repo, name, claude)
+	runner := s.Runner
+	if dryRun {
+		fmt.Fprintf(out, "would write: %s\n\n%s\n", unitPath, content)
+		runner = DryRunner{Out: out}
+	} else {
+		if err := os.MkdirAll(s.UnitDir, 0o755); err != nil {
+			return fmt.Errorf("create %q: %w", s.UnitDir, err)
+		}
+		if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil {
+			return fmt.Errorf("write %q: %w", unitPath, err)
+		}
 	}
 
 	for _, args := range [][]string{
 		{"--user", "daemon-reload"},
 		{"--user", "enable", "--now", unit},
 	} {
-		if _, err := s.Runner.Run("systemctl", args...); err != nil {
+		if _, err := runner.Run("systemctl", args...); err != nil {
 			return fmt.Errorf("systemctl %s: %w (to undo, run: claude-rc remove %s)", strings.Join(args, " "), err, name)
 		}
 	}
 
+	if dryRun {
+		return nil
+	}
 	fmt.Fprintf(out, "added %s: %s\n", name, unitPath)
 	fmt.Fprintf(out, "first time in this repo? run `claude remote-control` once in %s to answer the trust and enable prompts\n", repo)
 	fmt.Fprintln(out, "check it with: claude-rc status")

@@ -1,7 +1,6 @@
 package rcservice
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -9,10 +8,6 @@ import (
 )
 
 func (s *Service) Remove(out io.Writer, name string, dryRun bool) error {
-	if dryRun {
-		return errors.New("dry run isn't ready yet")
-	}
-
 	unknown := fmt.Errorf("no repo set up as %q, see claude-rc status", name)
 	if cleaned, err := unitName("", name); err != nil || cleaned != name {
 		return unknown
@@ -23,16 +18,26 @@ func (s *Service) Remove(out io.Writer, name string, dryRun bool) error {
 		return unknown
 	}
 
-	if _, err := s.Runner.Run("systemctl", "--user", "disable", "--now", unit); err != nil {
+	runner := s.Runner
+	if dryRun {
+		runner = DryRunner{Out: out}
+	}
+
+	if _, err := runner.Run("systemctl", "--user", "disable", "--now", unit); err != nil {
 		return fmt.Errorf("systemctl --user disable --now %s: %w", unit, err)
 	}
-	if err := os.Remove(unitPath); err != nil {
+	if dryRun {
+		fmt.Fprintf(out, "would delete: %s\n", unitPath)
+	} else if err := os.Remove(unitPath); err != nil {
 		return fmt.Errorf("delete %q: %w", unitPath, err)
 	}
-	if _, err := s.Runner.Run("systemctl", "--user", "daemon-reload"); err != nil {
+	if _, err := runner.Run("systemctl", "--user", "daemon-reload"); err != nil {
 		return fmt.Errorf("systemctl --user daemon-reload: %w", err)
 	}
 
+	if dryRun {
+		return nil
+	}
 	fmt.Fprintf(out, "removed %s\n", name)
 	return nil
 }

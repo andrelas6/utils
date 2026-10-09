@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"io"
 	"os/exec"
+	"strings"
 )
 
 type Runner interface {
@@ -21,4 +23,13 @@ func (ExecRunner) Run(name string, args ...string) ([]byte, error) {
 		}
 	}
 	return out, err
+}
+
+type DryRunner struct {
+	Out io.Writer
+}
+
+func (d DryRunner) Run(name string, args ...string) ([]byte, error) {
+	fmt.Fprintf(d.Out, "would run: %s\n", strings.Join(append([]string{name}, args...), " "))
+	return nil, nil
 }

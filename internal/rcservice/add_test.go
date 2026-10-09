@@ -172,17 +172,42 @@ func TestAddSystemctlFails(t *testing.T) {
 	}
 }
 
-// Dry run isn't built yet, so it's refused instead of quietly making real changes.
-func TestAddDryRunNotReady(t *testing.T) {
+// A dry run prints the unit file it would write and the systemctl commands it
+// would run, but writes nothing and runs nothing.
+func TestAddDryRun(t *testing.T) {
 	svc, runner := newTestService(t)
+	repo := t.TempDir()
+	var out bytes.Buffer
 
-	if err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", true); err == nil {
-		t.Fatal("expected an error")
+	if err := svc.Add(&out, repo, "utils", true); err != nil {
+		t.Fatal(err)
 	}
+
 	if _, err := os.Stat(svc.UnitDir); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("unit folder was created")
 	}
 	if len(runner.calls) != 0 {
 		t.Errorf("systemctl called: %q", runner.calls)
+	}
+	for _, want := range []string{
+		filepath.Join(svc.UnitDir, "claude-rc-utils.service"),
+		unitFile(repo, "utils", claudePath),
+		"would run: systemctl --user daemon-reload\n",
+		"would run: systemctl --user enable --now claude-rc-utils.service\n",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output is missing %q:\n%s", want, out.String())
+		}
+	}
+}
+
+// A dry run still checks the input, so it shows the same refusals a real
+// add would give.
+func TestAddDryRunStillRefuses(t *testing.T) {
+	svc, _ := newTestService(t)
+
+	err := svc.Add(&bytes.Buffer{}, svc.Home, "home", true)
+	if err == nil || !strings.Contains(err.Error(), "home folder") {
+		t.Fatalf("err = %v, want the home folder refusal", err)
 	}
 }

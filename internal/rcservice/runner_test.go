@@ -5,6 +5,19 @@ import (
 	"testing"
 )
 
+// The dry-run runner prints the command it was given and runs nothing.
+func TestDryRunner(t *testing.T) {
+	var out strings.Builder
+
+	got, err := DryRunner{Out: &out}.Run("systemctl", "--user", "daemon-reload")
+	if err != nil || len(got) != 0 {
+		t.Fatalf("got %q, %v; want no output and no error", got, err)
+	}
+	if out.String() != "would run: systemctl --user daemon-reload\n" {
+		t.Errorf("printed %q", out.String())
+	}
+}
+
 // When a program fails, the error includes what it printed on stderr, so the
 // user sees why systemctl failed.
 func TestExecRunnerErrorHasStderr(t *testing.T) {
