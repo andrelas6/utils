@@ -1,6 +1,6 @@
 # ae-plan: claude-rc — start Claude Remote Control per repo at login
 
-> **Status:** Draft
+> **Status:** Done — built in andrelas6/utils#1 (Ubuntu check still to do)
 > **Last updated:** 2026-10-10
 > **From:** ae-init `claude-rc`
 
@@ -122,3 +122,5 @@ Each item is one commit. After every commit, `claude-rc` builds and runs; the pa
 7. **Docs** — README + AGENTS.md table and setup note. `go vet`, `make test`, `make build-linux` pass. Then manual check on Ubuntu with the ae-init steps.
 
 **Size:** roughly 250 lines of code + 400 of tests ≈ 650 lines, over the 500-line mark. Proposed split, so each PR leaves a working command: **PR 1** = subtasks 1–3 (command with real `status`; `add` / `remove` still mocked); **PR 2** = subtasks 4–7 (real `add` / `remove`, dry run, docs, Ubuntu check).
+
+**What actually happened:** the branch came out at ~1,180 added lines (about 60% tests), well over the estimate. We kept it as **one PR** ([andrelas6/utils#1](https://github.com/andrelas6/utils/pull/1)) instead of the split above, to be read commit by commit.
