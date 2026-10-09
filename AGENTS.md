@@ -31,6 +31,7 @@ Existing programs:
 - Use build tags (`//go:build unix`, `//go:build linux`) for OS-specific code, with a fallback file so the module still compiles elsewhere.
 - Programs that delete, move or overwrite files must support a `-dry-run` flag.
 - Every `internal/` package has tests. Use `t.TempDir()` for filesystem tests.
+- Put a comment on top of every test function that explains the scenario it tests, in plain words (e.g. `// Bad arguments print the usage and never reach the services.`). This is the one exception to "no comments" in code.
 - When adding a program, add it to the table above and to `README.md`.
 
 ## Commands
