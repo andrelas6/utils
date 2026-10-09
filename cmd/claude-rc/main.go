@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 
 	"github.com/andrelas6/utils/internal/rcservice"
@@ -34,13 +35,19 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
 	svc := struct {
 		mockServices
 		*rcservice.Service
 	}{
 		Service: &rcservice.Service{
-			UnitDir: filepath.Join(configDir, "systemd", "user"),
-			Runner:  rcservice.ExecRunner{},
+			UnitDir:  filepath.Join(configDir, "systemd", "user"),
+			Home:     home,
+			Runner:   rcservice.ExecRunner{},
+			LookPath: exec.LookPath,
 		},
 	}
 

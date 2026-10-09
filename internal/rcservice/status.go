@@ -17,8 +17,10 @@ const (
 )
 
 type Service struct {
-	UnitDir string
-	Runner  Runner
+	UnitDir  string
+	Home     string
+	Runner   Runner
+	LookPath func(name string) (string, error)
 }
 
 func (s *Service) Status(out io.Writer) error {

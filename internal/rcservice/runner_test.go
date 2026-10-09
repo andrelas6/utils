@@ -1,6 +1,18 @@
 package rcservice
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+// When a program fails, the error includes what it printed on stderr, so the
+// user sees why systemctl failed.
+func TestExecRunnerErrorHasStderr(t *testing.T) {
+	_, err := ExecRunner{}.Run("sh", "-c", "echo 'Failed to connect to bus' >&2; exit 1")
+	if err == nil || !strings.Contains(err.Error(), "Failed to connect to bus") {
+		t.Fatalf("err = %v, want it to include stderr", err)
+	}
+}
 
 // The real runner returns what the program printed even when it exits with an
 // error, like systemctl is-active does for a stopped unit.
