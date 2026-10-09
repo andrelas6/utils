@@ -86,17 +86,37 @@ func TestRemoveDisableFails(t *testing.T) {
 	}
 }
 
-// Dry run isn't built yet, so it's refused instead of quietly making real changes.
-func TestRemoveDryRunNotReady(t *testing.T) {
+// A dry run prints the systemctl commands and the file it would delete, but
+// keeps the unit file and runs nothing.
+func TestRemoveDryRun(t *testing.T) {
 	svc, runner, unitPath := newServiceWithUnit(t, "utils")
+	var out bytes.Buffer
 
-	if err := svc.Remove(&bytes.Buffer{}, "utils", true); err == nil {
-		t.Fatal("expected an error")
+	if err := svc.Remove(&out, "utils", true); err != nil {
+		t.Fatal(err)
 	}
+
 	if _, err := os.Stat(unitPath); err != nil {
 		t.Errorf("unit file was deleted: %v", err)
 	}
 	if len(runner.calls) != 0 {
 		t.Errorf("systemctl called: %q", runner.calls)
+	}
+	want := "" +
+		"would run: systemctl --user disable --now claude-rc-utils.service\n" +
+		"would delete: " + unitPath + "\n" +
+		"would run: systemctl --user daemon-reload\n"
+	if out.String() != want {
+		t.Errorf("got:\n%s\nwant:\n%s", out.String(), want)
+	}
+}
+
+// A dry run for a name that isn't set up gives the same error as a real remove.
+func TestRemoveDryRunUnknown(t *testing.T) {
+	svc, _, _ := newServiceWithUnit(t, "utils")
+
+	err := svc.Remove(&bytes.Buffer{}, "web", true)
+	if err == nil || !strings.Contains(err.Error(), "claude-rc status") {
+		t.Fatalf("err = %v, want the unknown-name error", err)
 	}
 }
