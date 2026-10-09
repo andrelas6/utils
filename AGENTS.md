@@ -61,5 +61,6 @@ Rules for agents:
 
 - Don't write feature code before an ae-plan exists and the user has asked to build.
 - Follow the plan's subtask order; write the failing test first, then the code that makes it pass.
+- Commit every ae-init and ae-plan document with the change it describes: copy it from `~/.aecli/artifacts/utils/<ae-init|ae-plan>/<slug>.md` to `docs/ae-init/<slug>.md` or `docs/ae-plan/<slug>.md`, and update the copy whenever the doc changes.
 - Don't commit or push unless the user asks.
 - Never add a `Co-Authored-By:` line (or any other AI attribution) to commit messages or PR descriptions.
