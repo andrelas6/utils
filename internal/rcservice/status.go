@@ -22,7 +22,7 @@ type Service struct {
 }
 
 func (s *Service) Status(out io.Writer) error {
-	units, err := filepath.Glob(filepath.Join(s.UnitDir, unitPrefix+"*"+unitSuffix))
+	units, err := filepath.Glob(filepath.Join(s.UnitDir, unitFileName("*")))
 	if err != nil {
 		return fmt.Errorf("list units in %q: %w", s.UnitDir, err)
 	}
