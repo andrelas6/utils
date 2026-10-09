@@ -39,16 +39,11 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	svc := struct {
-		mockServices
-		*rcservice.Service
-	}{
-		Service: &rcservice.Service{
-			UnitDir:  filepath.Join(configDir, "systemd", "user"),
-			Home:     home,
-			Runner:   rcservice.ExecRunner{},
-			LookPath: exec.LookPath,
-		},
+	svc := &rcservice.Service{
+		UnitDir:  filepath.Join(configDir, "systemd", "user"),
+		Home:     home,
+		Runner:   rcservice.ExecRunner{},
+		LookPath: exec.LookPath,
 	}
 
 	if err := run(os.Args[1:], os.Stdout, os.Stderr, svc); err != nil {
