@@ -7,6 +7,9 @@ import (
 	"io"
 	"log"
 	"os"
+	"path/filepath"
+
+	"github.com/andrelas6/utils/internal/rcservice"
 )
 
 const usage = `usage:
@@ -27,7 +30,21 @@ func main() {
 	log.SetFlags(0)
 	log.SetPrefix("claude-rc: ")
 
-	if err := run(os.Args[1:], os.Stdout, os.Stderr, mockServices{}); err != nil {
+	configDir, err := os.UserConfigDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+	svc := struct {
+		mockServices
+		*rcservice.Service
+	}{
+		Service: &rcservice.Service{
+			UnitDir: filepath.Join(configDir, "systemd", "user"),
+			Runner:  rcservice.ExecRunner{},
+		},
+	}
+
+	if err := run(os.Args[1:], os.Stdout, os.Stderr, svc); err != nil {
 		if errors.Is(err, errUsage) {
 			os.Exit(2)
 		}
