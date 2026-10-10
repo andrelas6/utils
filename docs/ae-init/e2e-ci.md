@@ -1,6 +1,6 @@
 # ae-init: e2e-ci — claude-rc end-to-end against real systemd in CI
 
-> **Status:** Draft
+> **Status:** Done — built in andrelas6/utils#10
 > **Last updated:** 2026-10-10
 
 ## What to build
@@ -33,6 +33,7 @@ An end-to-end test that runs the real `claude-rc` binary against a real systemd 
 
 ## Open questions
 
-- Does `sudo loginctl enable-linger runner` give a working `systemctl --user` on the GitHub runner? Expected yes; first thing to prove in ae-plan.
-- `RestartSec=60` makes every restart scenario wait a minute or more. Accept a few slow minutes, or let the test shorten the wait (e.g. a systemd drop-in override written by the test, not a change to `claude-rc`)?
-- While waiting to restart, does systemd report `SubState=auto-restart`? This test will answer it (open since PR #5).
+- ~~Lingering on the GitHub runner~~ — works: `sudo loginctl enable-linger runner` + `XDG_RUNTIME_DIR=/run/user/1001` gives a working `systemctl --user` (run 38044380815).
+- ~~`SubState=auto-restart`~~ — confirmed: a unit waiting for its next try reports `ActiveState=activating SubState=auto-restart`, and `claude-rc status` shows `restarting` (run 38046266652).
+- ~~Does the job catch a real break?~~ — yes: a throwaway `Restart=no` commit failed "systemd starts it again within 90s" and "status shows it active again with a restart" (run 38046653384), then was dropped.
+- `RestartSec=60` makes the job take ~2 minutes. Shortening it is left for later, as agreed.

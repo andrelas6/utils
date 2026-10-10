@@ -1,6 +1,6 @@
 # ae-plan: e2e-ci — claude-rc end-to-end against real systemd in CI
 
-> **Status:** Draft
+> **Status:** Done — built in andrelas6/utils#10
 > **Last updated:** 2026-10-10
 > **From:** ae-init `e2e-ci`
 
@@ -56,8 +56,10 @@ A second job, `e2e`, in `.github/workflows/checks.yml`. On `ubuntu-latest` it tu
 
 ## Open questions
 
-- Lingering on the GitHub runner — proven or not by subtask 1.
-- `SubState=auto-restart` — answered by subtask 4's log.
+- ~~Lingering on the GitHub runner~~ — works: `sudo loginctl enable-linger runner` + `XDG_RUNTIME_DIR=/run/user/1001` gives a working `systemctl --user` (run 38044380815).
+- ~~`SubState=auto-restart`~~ — confirmed: a unit waiting for its next try reports `ActiveState=activating SubState=auto-restart`, and `claude-rc status` shows `restarting` (run 38046266652).
+- ~~Does the job catch a real break?~~ — yes: a throwaway `Restart=no` commit failed "systemd starts it again within 90s" and "status shows it active again with a restart" (run 38046653384), then was dropped.
+- `RestartSec=60` makes the job take ~2 minutes. Shortening it is left for later, as agreed.
 
 ## Subtasks
 
