@@ -10,7 +10,7 @@ import (
 	"os/exec"
 	"path/filepath"
 
-	"github.com/andrelas6/utils/internal/rcservice"
+	"github.com/andrelas6/utils/internal/remotecontrol"
 )
 
 const usage = `usage:
@@ -39,10 +39,10 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mgr := &rcservice.Manager{
+	mgr := &remotecontrol.Manager{
 		UnitDir:  filepath.Join(configDir, "systemd", "user"),
 		Home:     home,
-		Runner:   rcservice.ExecRunner{},
+		Runner:   remotecontrol.ExecRunner{},
 		LookPath: exec.LookPath,
 	}
 

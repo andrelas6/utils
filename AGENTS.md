@@ -23,7 +23,7 @@ Existing programs:
 | `lspm`      | Lists a folder's contents with their permissions, owner and group.                                 |
 | `claude-rc` | Sets up systemd user units that run `claude remote-control` per repo at login (`add`, `remove`, `status`). |
 
-`claude-rc` can't be run for real on macOS (no systemd): test logic with the fake runner in `internal/rcservice`, use `-dry-run` locally, and check real behaviour on Linux.
+`claude-rc` can't be run for real on macOS (no systemd): test logic with the fake runner in `internal/remotecontrol`, use `-dry-run` locally, and check real behaviour on Linux.
 
 ## Conventions
 
