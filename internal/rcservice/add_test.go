@@ -59,6 +59,51 @@ func TestAdd(t *testing.T) {
 	}
 }
 
+type outputAtFirstCall struct {
+	out  *bytes.Buffer
+	seen *string
+}
+
+func (o outputAtFirstCall) Run(string, ...string) ([]byte, error) {
+	if *o.seen == "" {
+		*o.seen = o.out.String()
+	}
+	return nil, nil
+}
+
+// The reminder to run claude remote-control once by hand is printed before
+// systemctl starts the unit, so the user reads it before an untrusted repo fails.
+func TestAddRemindsBeforeStarting(t *testing.T) {
+	svc, _ := newTestService(t)
+	var out bytes.Buffer
+	var beforeSystemctl string
+	svc.Runner = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
+
+	if err := svc.Add(&out, t.TempDir(), "utils", false); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(beforeSystemctl, "claude remote-control") {
+		t.Errorf("reminder not printed before systemctl ran; output then was:\n%q", beforeSystemctl)
+	}
+}
+
+// A dry run shows the reminder too, before the commands it would run.
+func TestAddDryRunReminds(t *testing.T) {
+	svc, _ := newTestService(t)
+	var out bytes.Buffer
+
+	if err := svc.Add(&out, t.TempDir(), "utils", true); err != nil {
+		t.Fatal(err)
+	}
+
+	reminder := strings.Index(out.String(), "claude remote-control` once")
+	firstCommand := strings.Index(out.String(), "would run:")
+	if reminder == -1 || reminder > firstCommand {
+		t.Errorf("reminder missing or after the commands:\n%s", out.String())
+	}
+}
+
 // A relative repo path like "." is saved as the full path, since systemd
 // needs an absolute WorkingDirectory.
 func TestAddRelativeRepo(t *testing.T) {

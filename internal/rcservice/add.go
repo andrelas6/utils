@@ -43,6 +43,7 @@ func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
 		}
 	}
 
+	fmt.Fprintf(out, "first time in this repo? run `claude remote-control` once in %s to answer the trust and enable prompts\n", repo)
 	for _, args := range [][]string{
 		{"--user", "daemon-reload"},
 		{"--user", "enable", "--now", unit},
@@ -56,7 +57,6 @@ func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
 		return nil
 	}
 	fmt.Fprintf(out, "added %s: %s\n", name, unitPath)
-	fmt.Fprintf(out, "first time in this repo? run `claude remote-control` once in %s to answer the trust and enable prompts\n", repo)
 	fmt.Fprintln(out, "check it with: claude-rc status")
 	return nil
 }
