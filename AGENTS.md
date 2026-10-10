@@ -50,6 +50,8 @@ Before declaring work done: `go vet ./...` and `make test` pass, and `make build
 
 Every pull request runs the same checks on GitHub (`.github/workflows/checks.yml`, Ubuntu and macOS), plus `gofmt -l .` and a `claude-rc add -dry-run` / `lspm` smoke test. A red check blocks the change; fix it rather than skipping it.
 
+The `e2e` job (Ubuntu only) runs `e2e/run.sh`: the real `claude-rc` against a real systemd user session (lingering on the runner), with `e2e/fake-claude` standing in for `claude` (a `.fail` file in a repo makes it exit with 1). It can't run on macOS. When `claude-rc` behaviour changes, add or update a scenario there.
+
 ## Workflow
 
 Every change goes through these skills, in order:

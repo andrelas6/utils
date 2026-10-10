@@ -26,6 +26,7 @@ make test
 ```
 
 Every pull request runs formatting, `go vet`, the tests, the Linux build and a smoke test on Ubuntu and macOS (`.github/workflows/checks.yml`).
+An `e2e` job also runs `claude-rc` for real against systemd on Ubuntu, with a fake `claude` (`e2e/run.sh`).
 
 ## claude-rc
 
