@@ -1,6 +1,6 @@
 # ae-plan: review-naming — plainer names in claude-rc
 
-> **Status:** Draft
+> **Status:** Done
 > **Last updated:** 2026-10-10
 > **From:** ae-init `review-naming`
 

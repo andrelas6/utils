@@ -1,6 +1,6 @@
 # ae-init: review-naming — plainer names in claude-rc
 
-> **Status:** Draft
+> **Status:** Done
 > **Last updated:** 2026-10-10
 > **From:** ae-review `pr-1`, section "naming and language"
 
