@@ -30,17 +30,9 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	}
 
 	content := unitFileContent(repo, name, claude)
-	runner := m.machine
-	if dryRun {
-		fmt.Fprintf(out, "would write: %s\n\n%s\n", unitPath, content)
-		runner = dryRunMachine{out: out}
-	} else {
-		if err := os.MkdirAll(m.unitDir, 0o755); err != nil {
-			return fmt.Errorf("create %q: %w", m.unitDir, err)
-		}
-		if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil {
-			return fmt.Errorf("write %q: %w", unitPath, err)
-		}
+	mc := m.machineFor(out, dryRun)
+	if err := mc.WriteFile(unitPath, []byte(content)); err != nil {
+		return fmt.Errorf("write %q: %w", unitPath, err)
 	}
 
 	fmt.Fprintf(out, "first time in this repo? run `claude remote-control` once in %s to answer the trust and enable prompts\n", repo)
@@ -48,7 +40,7 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 		{"--user", "daemon-reload"},
 		{"--user", "enable", "--now", unit},
 	} {
-		if _, err := runner.Run("systemctl", args...); err != nil {
+		if _, err := mc.Run("systemctl", args...); err != nil {
 			return fmt.Errorf("systemctl %s: %w (to undo, run: claude-rc remove %s)", strings.Join(args, " "), err, name)
 		}
 	}
