@@ -78,8 +78,17 @@ func (m *Manager) resolveRepo(repo string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf("%s is not a folder", abs)
 	}
-	if abs == filepath.Clean(m.home) {
+	if sameFolder(abs, m.home) {
 		return "", fmt.Errorf("%s is your home folder; claude never saves trust there, pick a repo", abs)
 	}
 	return abs, nil
+}
+
+func sameFolder(a, b string) bool {
+	realA, errA := filepath.EvalSymlinks(a)
+	realB, errB := filepath.EvalSymlinks(b)
+	if errA != nil || errB != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return realA == realB
 }

@@ -149,6 +149,13 @@ func TestAddRefuses(t *testing.T) {
 		{"home folder", func(t *testing.T, svc *Manager) (string, string) {
 			return svc.home, "home"
 		}, "home folder"},
+		{"link to home folder", func(t *testing.T, svc *Manager) (string, string) {
+			link := filepath.Join(t.TempDir(), "myhome")
+			if err := os.Symlink(svc.home, link); err != nil {
+				t.Fatal(err)
+			}
+			return link, "home"
+		}, "home folder"},
 		{"no usable name", func(t *testing.T, svc *Manager) (string, string) {
 			return t.TempDir(), "%%%"
 		}, "-name"},
