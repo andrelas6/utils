@@ -1,6 +1,6 @@
 # ae-plan: review-error-handling — claude-rc says why something is wrong
 
-> **Status:** Draft
+> **Status:** Done
 > **Last updated:** 2026-10-10
 > **From:** ae-init `review-error-handling`
 
