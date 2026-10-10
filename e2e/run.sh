@@ -61,6 +61,14 @@ is_active() {
 	[ "$(systemctl --user is-active "$1")" = "active" ]
 }
 
+restarts_of() {
+	systemctl --user show --property=NRestarts --value "$1"
+}
+
+came_back() {
+	is_active "$1" && [ "$(restarts_of "$1")" -ge 1 ]
+}
+
 user_manager_answers() {
 	systemctl --user list-units --no-pager >/dev/null
 }
@@ -77,6 +85,13 @@ check "claude runs in the repo with the right arguments" \
 check "status succeeds" run_claude_rc status
 check "status shows it active with no restarts" last_output_has "^healthy +active +0 +0 +$work/healthy\$"
 check "status says logged in" last_output_has "^logged in: yes\$"
+
+echo
+echo "== restart after a crash"
+check "the claude process can be killed" systemctl --user kill --signal=SIGKILL claude-rc-healthy.service
+check "systemd starts it again within 90s" wait_for 90 came_back claude-rc-healthy.service
+check "status succeeds" run_claude_rc status
+check "status shows it active again with a restart" last_output_has "^healthy +active +[1-9][0-9]* "
 
 echo
 echo "$failures failed"
