@@ -15,32 +15,32 @@ type call struct {
 	args   []any
 }
 
-type fakeServices struct {
+type fakeManager struct {
 	calls []call
 	err   error
 }
 
-func (f *fakeServices) Add(out io.Writer, repo, name string, dryRun bool) error {
+func (f *fakeManager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	f.calls = append(f.calls, call{"Add", []any{repo, name, dryRun}})
 	fmt.Fprintln(out, "fake add")
 	return f.err
 }
 
-func (f *fakeServices) Remove(out io.Writer, name string, dryRun bool) error {
+func (f *fakeManager) Remove(out io.Writer, name string, dryRun bool) error {
 	f.calls = append(f.calls, call{"Remove", []any{name, dryRun}})
 	fmt.Fprintln(out, "fake remove")
 	return f.err
 }
 
-func (f *fakeServices) Status(out io.Writer) error {
+func (f *fakeManager) Status(out io.Writer) error {
 	f.calls = append(f.calls, call{"Status", nil})
 	fmt.Fprintln(out, "fake status")
 	return f.err
 }
 
-// Each command, with and without its flags, calls the matching service method
-// once with the right arguments, and the service's output reaches stdout.
-func TestRunCallsServices(t *testing.T) {
+// Each command, with and without its flags, calls the matching manager method
+// once with the right arguments, and the manager's output reaches stdout.
+func TestRunCallsManager(t *testing.T) {
 	tests := []struct {
 		args    []string
 		want    call
@@ -55,14 +55,14 @@ func TestRunCallsServices(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(strings.Join(tt.args, " "), func(t *testing.T) {
-			svc := &fakeServices{}
+			mgr := &fakeManager{}
 			var out, errOut bytes.Buffer
 
-			if err := run(tt.args, &out, &errOut, svc); err != nil {
+			if err := run(tt.args, &out, &errOut, mgr); err != nil {
 				t.Fatalf("run: %v", err)
 			}
-			if !reflect.DeepEqual(svc.calls, []call{tt.want}) {
-				t.Errorf("calls = %v, want %v", svc.calls, []call{tt.want})
+			if !reflect.DeepEqual(mgr.calls, []call{tt.want}) {
+				t.Errorf("calls = %v, want %v", mgr.calls, []call{tt.want})
 			}
 			if out.String() != tt.wantOut {
 				t.Errorf("out = %q, want %q", out.String(), tt.wantOut)
@@ -72,7 +72,7 @@ func TestRunCallsServices(t *testing.T) {
 }
 
 // Missing, unknown or extra arguments and unknown flags print the usage to
-// stderr, return an error, and never reach the services.
+// stderr, return an error, and never reach the manager.
 func TestRunBadArgsShowsUsage(t *testing.T) {
 	tests := [][]string{
 		{},
@@ -87,14 +87,14 @@ func TestRunBadArgsShowsUsage(t *testing.T) {
 
 	for _, args := range tests {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
-			svc := &fakeServices{}
+			mgr := &fakeManager{}
 			var out, errOut bytes.Buffer
 
-			if err := run(args, &out, &errOut, svc); err == nil {
+			if err := run(args, &out, &errOut, mgr); err == nil {
 				t.Fatal("expected an error")
 			}
-			if len(svc.calls) != 0 {
-				t.Errorf("services called: %v", svc.calls)
+			if len(mgr.calls) != 0 {
+				t.Errorf("manager called: %v", mgr.calls)
 			}
 			if !strings.Contains(errOut.String(), "usage:") {
 				t.Errorf("usage not shown, stderr = %q", errOut.String())
@@ -103,12 +103,12 @@ func TestRunBadArgsShowsUsage(t *testing.T) {
 	}
 }
 
-// When a service method fails, run returns that same error instead of hiding it.
-func TestRunReturnsServiceError(t *testing.T) {
+// When a manager method fails, run returns that same error instead of hiding it.
+func TestRunReturnsManagerError(t *testing.T) {
 	boom := errors.New("boom")
-	svc := &fakeServices{err: boom}
+	mgr := &fakeManager{err: boom}
 
-	err := run([]string{"status"}, io.Discard, io.Discard, svc)
+	err := run([]string{"status"}, io.Discard, io.Discard, mgr)
 	if !errors.Is(err, boom) {
 		t.Fatalf("err = %v, want %v", err, boom)
 	}

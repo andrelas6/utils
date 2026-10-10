@@ -12,10 +12,10 @@ import (
 
 const claudePath = "/home/a/.local/bin/claude"
 
-func newTestService(t *testing.T) (*Service, *fakeRunner) {
+func newTestManager(t *testing.T) (*Manager, *fakeRunner) {
 	t.Helper()
 	runner := &fakeRunner{}
-	return &Service{
+	return &Manager{
 		UnitDir: filepath.Join(t.TempDir(), "systemd", "user"),
 		Home:    t.TempDir(),
 		Runner:  runner,
@@ -31,7 +31,7 @@ func newTestService(t *testing.T) (*Service, *fakeRunner) {
 // Adding a repo writes its unit file, reloads systemd, then enables and
 // starts the unit, and reminds the user about the one-time prompts.
 func TestAdd(t *testing.T) {
-	svc, runner := newTestService(t)
+	svc, runner := newTestManager(t)
 	repo := t.TempDir()
 	var out bytes.Buffer
 
@@ -74,7 +74,7 @@ func (o outputAtFirstCall) Run(string, ...string) ([]byte, error) {
 // The reminder to run claude remote-control once by hand is printed before
 // systemctl starts the unit, so the user reads it before an untrusted repo fails.
 func TestAddRemindsBeforeStarting(t *testing.T) {
-	svc, _ := newTestService(t)
+	svc, _ := newTestManager(t)
 	var out bytes.Buffer
 	var beforeSystemctl string
 	svc.Runner = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
@@ -90,7 +90,7 @@ func TestAddRemindsBeforeStarting(t *testing.T) {
 
 // A dry run shows the reminder too, before the commands it would run.
 func TestAddDryRunReminds(t *testing.T) {
-	svc, _ := newTestService(t)
+	svc, _ := newTestManager(t)
 	var out bytes.Buffer
 
 	if err := svc.Add(&out, t.TempDir(), "utils", true); err != nil {
@@ -107,7 +107,7 @@ func TestAddDryRunReminds(t *testing.T) {
 // A relative repo path like "." is saved as the full path, since systemd
 // needs an absolute WorkingDirectory.
 func TestAddRelativeRepo(t *testing.T) {
-	svc, _ := newTestService(t)
+	svc, _ := newTestManager(t)
 	t.Chdir(t.TempDir())
 	wd, err := os.Getwd()
 	if err != nil {
@@ -132,26 +132,26 @@ func TestAddRelativeRepo(t *testing.T) {
 func TestAddRefuses(t *testing.T) {
 	tests := []struct {
 		name  string
-		setup func(t *testing.T, svc *Service) (repo, name string)
+		setup func(t *testing.T, svc *Manager) (repo, name string)
 		want  string
 	}{
-		{"missing folder", func(t *testing.T, svc *Service) (string, string) {
+		{"missing folder", func(t *testing.T, svc *Manager) (string, string) {
 			return filepath.Join(t.TempDir(), "nope"), ""
 		}, "nope"},
-		{"file, not folder", func(t *testing.T, svc *Service) (string, string) {
+		{"file, not folder", func(t *testing.T, svc *Manager) (string, string) {
 			file := filepath.Join(t.TempDir(), "notes.txt")
 			if err := os.WriteFile(file, nil, 0o644); err != nil {
 				t.Fatal(err)
 			}
 			return file, ""
 		}, "not a folder"},
-		{"home folder", func(t *testing.T, svc *Service) (string, string) {
+		{"home folder", func(t *testing.T, svc *Manager) (string, string) {
 			return svc.Home, "home"
 		}, "home folder"},
-		{"no usable name", func(t *testing.T, svc *Service) (string, string) {
+		{"no usable name", func(t *testing.T, svc *Manager) (string, string) {
 			return t.TempDir(), "%%%"
 		}, "-name"},
-		{"claude not found", func(t *testing.T, svc *Service) (string, string) {
+		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
 			svc.LookPath = func(string) (string, error) { return "", errors.New("not found") }
 			return t.TempDir(), "utils"
 		}, "claude"},
@@ -159,7 +159,7 @@ func TestAddRefuses(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			svc, runner := newTestService(t)
+			svc, runner := newTestManager(t)
 			repo, name := tt.setup(t, svc)
 
 			err := svc.Add(&bytes.Buffer{}, repo, name, false)
@@ -179,7 +179,7 @@ func TestAddRefuses(t *testing.T) {
 // Adding a name that is already set up is refused and leaves the existing
 // unit file as it was.
 func TestAddExistingUnit(t *testing.T) {
-	svc, runner := newTestService(t)
+	svc, runner := newTestManager(t)
 	if err := os.MkdirAll(svc.UnitDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -201,7 +201,7 @@ func TestAddExistingUnit(t *testing.T) {
 // When systemctl fails, add returns an error naming the command and tells the
 // user how to undo the half-done setup.
 func TestAddSystemctlFails(t *testing.T) {
-	svc, runner := newTestService(t)
+	svc, runner := newTestManager(t)
 	runner.replies = map[string]reply{
 		"systemctl --user enable --now claude-rc-utils.service": {err: errors.New("Failed to connect to bus")},
 	}
@@ -220,7 +220,7 @@ func TestAddSystemctlFails(t *testing.T) {
 // A dry run prints the unit file it would write and the systemctl commands it
 // would run, but writes nothing and runs nothing.
 func TestAddDryRun(t *testing.T) {
-	svc, runner := newTestService(t)
+	svc, runner := newTestManager(t)
 	repo := t.TempDir()
 	var out bytes.Buffer
 
@@ -249,7 +249,7 @@ func TestAddDryRun(t *testing.T) {
 // A dry run still checks the input, so it shows the same refusals a real
 // add would give.
 func TestAddDryRunStillRefuses(t *testing.T) {
-	svc, _ := newTestService(t)
+	svc, _ := newTestManager(t)
 
 	err := svc.Add(&bytes.Buffer{}, svc.Home, "home", true)
 	if err == nil || !strings.Contains(err.Error(), "home folder") {

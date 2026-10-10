@@ -8,7 +8,7 @@ import (
 	"strings"
 )
 
-func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
+func (s *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	repo, err := s.resolveRepo(repo)
 	if err != nil {
 		return err
@@ -61,7 +61,7 @@ func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
 	return nil
 }
 
-func (s *Service) resolveRepo(repo string) (string, error) {
+func (s *Manager) resolveRepo(repo string) (string, error) {
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return "", fmt.Errorf("resolve %q: %w", repo, err)

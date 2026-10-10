@@ -21,7 +21,7 @@ const usage = `usage:
 
 var errUsage = errors.New("wrong arguments")
 
-type services interface {
+type manager interface {
 	Add(out io.Writer, repo, name string, dryRun bool) error
 	Remove(out io.Writer, name string, dryRun bool) error
 	Status(out io.Writer) error
@@ -39,14 +39,14 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	svc := &rcservice.Service{
+	mgr := &rcservice.Manager{
 		UnitDir:  filepath.Join(configDir, "systemd", "user"),
 		Home:     home,
 		Runner:   rcservice.ExecRunner{},
 		LookPath: exec.LookPath,
 	}
 
-	if err := run(os.Args[1:], os.Stdout, os.Stderr, svc); err != nil {
+	if err := run(os.Args[1:], os.Stdout, os.Stderr, mgr); err != nil {
 		if errors.Is(err, errUsage) {
 			os.Exit(2)
 		}
@@ -54,7 +54,7 @@ func main() {
 	}
 }
 
-func run(args []string, out, errOut io.Writer, svc services) error {
+func run(args []string, out, errOut io.Writer, mgr manager) error {
 	if len(args) == 0 {
 		return showUsage(errOut, errors.New("missing command"))
 	}
@@ -69,7 +69,7 @@ func run(args []string, out, errOut io.Writer, svc services) error {
 		if err != nil {
 			return showUsage(errOut, err)
 		}
-		return svc.Add(out, repo, *name, *dryRun)
+		return mgr.Add(out, repo, *name, *dryRun)
 
 	case "remove":
 		fs := newFlagSet(cmd, errOut)
@@ -78,13 +78,13 @@ func run(args []string, out, errOut io.Writer, svc services) error {
 		if err != nil {
 			return showUsage(errOut, err)
 		}
-		return svc.Remove(out, name, *dryRun)
+		return mgr.Remove(out, name, *dryRun)
 
 	case "status":
 		if len(args) != 0 {
 			return showUsage(errOut, errors.New("status takes no arguments"))
 		}
-		return svc.Status(out)
+		return mgr.Status(out)
 
 	default:
 		return showUsage(errOut, fmt.Errorf("unknown command %q", cmd))
