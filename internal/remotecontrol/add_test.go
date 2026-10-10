@@ -177,6 +177,27 @@ func TestAddRefuses(t *testing.T) {
 	}
 }
 
+// When the unit folder can't be read, add can't tell whether the repo is
+// already set up, so it stops and says so instead of trying to write.
+func TestAddCantCheckUnitFolder(t *testing.T) {
+	svc, runner := newTestManager(t)
+	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(svc.unitDir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(svc.unitDir, 0o755) })
+
+	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
+	if err == nil || !strings.Contains(err.Error(), "can't check") {
+		t.Fatalf("err = %v, want 'can't check'", err)
+	}
+	if len(runner.calls) != 0 {
+		t.Errorf("systemctl called: %q", runner.calls)
+	}
+}
+
 // Adding a name that is already set up is refused and leaves the existing
 // unit file as it was.
 func TestAddExistingUnit(t *testing.T) {
@@ -199,9 +220,9 @@ func TestAddExistingUnit(t *testing.T) {
 	}
 }
 
-// When systemctl fails, add returns an error naming the command and tells the
-// user how to undo the half-done setup.
-func TestAddSystemctlFails(t *testing.T) {
+// When systemctl fails, add undoes its work (disables the unit, deletes the
+// file, reloads systemd) and the error names the command and says it cleaned up.
+func TestAddSystemctlFailsRollsBack(t *testing.T) {
 	svc, runner := newTestManager(t)
 	runner.replies = map[string]reply{
 		"systemctl --user enable --now claude-rc-utils.service": {err: errors.New("Failed to connect to bus")},
@@ -211,10 +232,37 @@ func TestAddSystemctlFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, want := range []string{"enable --now claude-rc-utils.service", "Failed to connect to bus", "claude-rc remove utils"} {
+	for _, want := range []string{"enable --now claude-rc-utils.service", "Failed to connect to bus", "removed again"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v, want it to mention %q", err, want)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(svc.unitDir, "claude-rc-utils.service")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("unit file still there")
+	}
+	wantCalls := []string{
+		"systemctl --user daemon-reload",
+		"systemctl --user enable --now claude-rc-utils.service",
+		"systemctl --user disable --now claude-rc-utils.service",
+		"systemctl --user daemon-reload",
+	}
+	if !reflect.DeepEqual(runner.calls, wantCalls) {
+		t.Errorf("calls = %q, want %q", runner.calls, wantCalls)
+	}
+}
+
+// When the clean-up fails too, the error still tells the user how to undo
+// the half-done setup by hand.
+func TestAddRollbackFails(t *testing.T) {
+	svc, runner := newTestManager(t)
+	runner.replies = map[string]reply{
+		"systemctl --user enable --now claude-rc-utils.service":  {err: errors.New("Failed to connect to bus")},
+		"systemctl --user disable --now claude-rc-utils.service": {err: errors.New("Failed to connect to bus")},
+	}
+
+	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
+	if err == nil || !strings.Contains(err.Error(), "to undo, run: claude-rc remove utils") {
+		t.Fatalf("err = %v, want the manual undo hint", err)
 	}
 }
 
