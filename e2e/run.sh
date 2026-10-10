@@ -7,7 +7,8 @@ unit_dir="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
 work=$(mktemp -d "${RUNNER_TEMP:-/tmp}/claude-rc-e2e.XXXXXX")
 calls="$work/bin/calls.log"
 
-mkdir -p "$work/bin" "$work/healthy"
+mkdir -p "$work/bin" "$work/healthy" "$work/broken"
+touch "$work/broken/.fail"
 cp "$here/fake-claude" "$work/bin/claude"
 chmod +x "$work/bin/claude"
 export PATH="$work/bin:$PATH"
@@ -69,6 +70,10 @@ came_back() {
 	is_active "$1" && [ "$(restarts_of "$1")" -ge 1 ]
 }
 
+keeps_failing() {
+	! is_active "$1" && [ "$(systemctl --user show --property=ExecMainStatus --value "$1")" = "1" ]
+}
+
 user_manager_answers() {
 	systemctl --user list-units --no-pager >/dev/null
 }
@@ -92,6 +97,15 @@ check "the claude process can be killed" systemctl --user kill --signal=SIGKILL 
 check "systemd starts it again within 90s" wait_for 90 came_back claude-rc-healthy.service
 check "status succeeds" run_claude_rc status
 check "status shows it active again with a restart" last_output_has "^healthy +active +[1-9][0-9]* "
+
+echo
+echo "== repo where claude keeps exiting"
+check "add succeeds" run_claude_rc add "$work/broken"
+check "claude exits with 1 and the unit isn't active" wait_for 30 keeps_failing claude-rc-broken.service
+echo "systemd says: $(systemctl --user show --property=ActiveState,SubState,NRestarts claude-rc-broken.service | tr '\n' ' ')"
+check "status succeeds" run_claude_rc status
+check "status shows it restarting or failed, last exit 1" last_output_has "^broken +(restarting|activating|failed) +[0-9]+ +1 +"
+check "status says where to look" last_output_has "^see why broken isn't running: journalctl --user -u claude-rc-broken\$"
 
 echo
 echo "$failures failed"
