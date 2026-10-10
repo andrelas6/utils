@@ -31,6 +31,9 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	if err != nil {
 		return fmt.Errorf("can't find claude: %w", err)
 	}
+	if strings.ContainsAny(claude, " \t\n\r") {
+		return fmt.Errorf("claude is at %q; a space or line break in that path breaks the unit's ExecStart, so put claude (or a link to it) in a folder without one", claude)
+	}
 
 	content := unitFileContent(repo, name, claude)
 	mc := m.machineFor(out, dryRun)
@@ -61,6 +64,9 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 }
 
 func (m *Manager) resolveRepo(repo string) (string, error) {
+	if strings.ContainsAny(repo, "\n\r") {
+		return "", fmt.Errorf("%q has a line break in it, which a systemd unit can't hold; rename the folder", repo)
+	}
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return "", fmt.Errorf("resolve %q: %w", repo, err)
@@ -72,8 +78,17 @@ func (m *Manager) resolveRepo(repo string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf("%s is not a folder", abs)
 	}
-	if abs == filepath.Clean(m.home) {
+	if sameFolder(abs, m.home) {
 		return "", fmt.Errorf("%s is your home folder; claude never saves trust there, pick a repo", abs)
 	}
 	return abs, nil
+}
+
+func sameFolder(a, b string) bool {
+	realA, errA := filepath.EvalSymlinks(a)
+	realB, errB := filepath.EvalSymlinks(b)
+	if errA != nil || errB != nil {
+		return filepath.Clean(a) == filepath.Clean(b)
+	}
+	return realA == realB
 }

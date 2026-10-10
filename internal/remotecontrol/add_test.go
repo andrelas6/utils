@@ -132,30 +132,49 @@ func TestAddRelativeRepo(t *testing.T) {
 // systemctl is never called.
 func TestAddRefuses(t *testing.T) {
 	tests := []struct {
-		name  string
-		setup func(t *testing.T, svc *Manager) (repo, name string)
-		want  string
+		name   string
+		setup  func(t *testing.T, svc *Manager) (repo, name string)
+		want   string
+		wantIs error
 	}{
 		{"missing folder", func(t *testing.T, svc *Manager) (string, string) {
 			return filepath.Join(t.TempDir(), "nope"), ""
-		}, "nope"},
+		}, "nope", os.ErrNotExist},
 		{"file, not folder", func(t *testing.T, svc *Manager) (string, string) {
 			file := filepath.Join(t.TempDir(), "notes.txt")
 			if err := os.WriteFile(file, nil, 0o644); err != nil {
 				t.Fatal(err)
 			}
 			return file, ""
-		}, "not a folder"},
+		}, "not a folder", nil},
 		{"home folder", func(t *testing.T, svc *Manager) (string, string) {
 			return svc.home, "home"
-		}, "home folder"},
+		}, "home folder", nil},
+		{"link to home folder", func(t *testing.T, svc *Manager) (string, string) {
+			link := filepath.Join(t.TempDir(), "myhome")
+			if err := os.Symlink(svc.home, link); err != nil {
+				t.Fatal(err)
+			}
+			return link, "home"
+		}, "home folder", nil},
 		{"no usable name", func(t *testing.T, svc *Manager) (string, string) {
 			return t.TempDir(), "%%%"
-		}, "-name"},
+		}, "-name", nil},
+		{"line break in repo path", func(t *testing.T, svc *Manager) (string, string) {
+			repo := filepath.Join(t.TempDir(), "two\nlines")
+			if err := os.Mkdir(repo, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			return repo, "two-lines"
+		}, "line break", nil},
+		{"space in claude path", func(t *testing.T, svc *Manager) (string, string) {
+			svc.lookPath = func(string) (string, error) { return "/tmp/my bin/claude", nil }
+			return t.TempDir(), "utils"
+		}, "space", nil},
 		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
 			svc.lookPath = func(string) (string, error) { return "", errors.New("not found") }
 			return t.TempDir(), "utils"
-		}, "claude"},
+		}, "claude", nil},
 	}
 
 	for _, tt := range tests {
@@ -166,6 +185,9 @@ func TestAddRefuses(t *testing.T) {
 			err := svc.Add(&bytes.Buffer{}, repo, name, false)
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to mention %q", err, tt.want)
+			}
+			if tt.wantIs != nil && !errors.Is(err, tt.wantIs) {
+				t.Errorf("err = %v, want it to be %v", err, tt.wantIs)
 			}
 			if _, statErr := os.Stat(svc.unitDir); !errors.Is(statErr, os.ErrNotExist) {
 				t.Errorf("unit folder was created")
