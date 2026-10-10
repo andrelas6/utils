@@ -11,6 +11,10 @@ import (
 	"text/tabwriter"
 )
 
+type unitInfo struct {
+	state, restarts, lastExit string
+}
+
 func (m *Manager) Status(out io.Writer) error {
 	units, err := filepath.Glob(filepath.Join(m.unitDir, unitFileName("*")))
 	if err != nil {
@@ -20,19 +24,29 @@ func (m *Manager) Status(out io.Writer) error {
 	if len(units) == 0 {
 		fmt.Fprintln(out, "no repos set up")
 	} else {
+		var notRunning []string
 		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tSTATE\tREPO")
+		fmt.Fprintln(w, "NAME\tSTATE\tRESTARTS\tLAST EXIT\tREPO")
 		for _, path := range units {
 			unit := filepath.Base(path)
-			state, err := m.unitState(unit)
+			name := strings.TrimSuffix(strings.TrimPrefix(unit, unitPrefix), unitSuffix)
+			st, err := m.unitState(unit)
 			if err != nil {
 				return err
 			}
-			name := strings.TrimSuffix(strings.TrimPrefix(unit, unitPrefix), unitSuffix)
-			fmt.Fprintf(w, "%s\t%s\t%s\n", name, state, repoOf(path))
+			if st.state != "active" {
+				notRunning = append(notRunning, name)
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", name, st.state, st.restarts, st.lastExit, repoOf(path))
 		}
 		if err := w.Flush(); err != nil {
 			return err
+		}
+		if len(notRunning) > 0 {
+			fmt.Fprintln(out)
+		}
+		for _, name := range notRunning {
+			fmt.Fprintf(out, "see why %s isn't running: journalctl --user -u %s%s\n", name, unitPrefix, name)
 		}
 	}
 
@@ -40,13 +54,30 @@ func (m *Manager) Status(out io.Writer) error {
 	return nil
 }
 
-func (m *Manager) unitState(unit string) (string, error) {
-	out, err := m.machine.Run("systemctl", "--user", "is-active", unit)
-	state := strings.TrimSpace(string(out))
-	if state == "" && err != nil {
-		return "", fmt.Errorf("systemctl --user is-active %s: %w", unit, err)
+func (m *Manager) unitState(unit string) (unitInfo, error) {
+	out, err := m.machine.Run("systemctl", "--user", "show", unit, "--property=ActiveState,SubState,NRestarts,ExecMainStatus")
+	if err != nil {
+		return unitInfo{}, fmt.Errorf("systemctl --user show %s: %w", unit, err)
 	}
-	return state, nil
+
+	props := map[string]string{}
+	for line := range strings.Lines(string(out)) {
+		if key, value, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
+			props[key] = value
+		}
+	}
+	orUnknown := func(key string) string {
+		if v := props[key]; v != "" {
+			return v
+		}
+		return "?"
+	}
+
+	st := unitInfo{state: orUnknown("ActiveState"), restarts: orUnknown("NRestarts"), lastExit: orUnknown("ExecMainStatus")}
+	if props["SubState"] == "auto-restart" {
+		st.state = "restarting"
+	}
+	return st, nil
 }
 
 func (m *Manager) loggedIn() string {

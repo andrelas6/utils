@@ -11,12 +11,17 @@ import (
 
 const authCmd = "claude auth status --json"
 
-func isActiveCmd(name string) string {
-	return "systemctl --user is-active claude-rc-" + name + ".service"
+func showCmd(name string) string {
+	return "systemctl --user show claude-rc-" + name + ".service --property=ActiveState,SubState,NRestarts,ExecMainStatus"
 }
 
-// Two set-up repos are listed sorted by name, each with the state systemd
-// reports and its repo folder; files that aren't claude-rc units are ignored.
+func showReply(active, sub, restarts, exit string) reply {
+	return reply{out: "ActiveState=" + active + "\nSubState=" + sub + "\nNRestarts=" + restarts + "\nExecMainStatus=" + exit + "\n"}
+}
+
+// Two set-up repos are listed sorted by name, each with its state, restart
+// count, last exit status and repo folder, and the one that isn't running gets
+// a line saying where to look; files that aren't claude-rc units are ignored.
 func TestStatusListsUnits(t *testing.T) {
 	dir := t.TempDir()
 	writeUnit(t, dir, "web", "/home/a/web")
@@ -25,9 +30,9 @@ func TestStatusListsUnits(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := &fakeMachine{replies: map[string]reply{
-		isActiveCmd("utils"): {out: "active\n"},
-		isActiveCmd("web"):   {out: "failed\n", err: errors.New("exit status 3")},
-		authCmd:              {out: `{"loggedIn": true}`},
+		showCmd("utils"): showReply("active", "running", "0", "0"),
+		showCmd("web"):   showReply("failed", "failed", "5", "1"),
+		authCmd:          {out: `{"loggedIn": true}`},
 	}}
 	var out bytes.Buffer
 
@@ -36,9 +41,11 @@ func TestStatusListsUnits(t *testing.T) {
 	}
 
 	want := "" +
-		"NAME   STATE   REPO\n" +
-		"utils  active  /home/a/utils\n" +
-		"web    failed  /home/a/web\n" +
+		"NAME   STATE   RESTARTS  LAST EXIT  REPO\n" +
+		"utils  active  0         0          /home/a/utils\n" +
+		"web    failed  5         1          /home/a/web\n" +
+		"\n" +
+		"see why web isn't running: journalctl --user -u claude-rc-web\n" +
 		"\n" +
 		"logged in: yes\n"
 	if out.String() != want {
@@ -55,7 +62,7 @@ func TestStatusUnescapesPercent(t *testing.T) {
 		t.Fatal(err)
 	}
 	runner := &fakeMachine{replies: map[string]reply{
-		isActiveCmd("My-Repo"): {out: "active\n"},
+		showCmd("My-Repo"): showReply("active", "running", "0", "0"),
 	}}
 	var out bytes.Buffer
 
@@ -65,6 +72,30 @@ func TestStatusUnescapesPercent(t *testing.T) {
 
 	if !strings.Contains(out.String(), "/home/a/My Repo%\n") {
 		t.Errorf("repo not shown as /home/a/My Repo%%:\n%s", out.String())
+	}
+}
+
+// A unit that keeps failing and is waiting for its next try shows as
+// restarting with its restart count and last exit status, not as starting up.
+func TestStatusRestarting(t *testing.T) {
+	dir := t.TempDir()
+	writeUnit(t, dir, "untrusted", "/home/a/untrusted")
+	runner := &fakeMachine{replies: map[string]reply{
+		showCmd("untrusted"): showReply("activating", "auto-restart", "4", "1"),
+	}}
+	var out bytes.Buffer
+
+	if err := (&Manager{unitDir: dir, machine: runner}).Status(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, want := range []string{
+		"untrusted  restarting  4         1          /home/a/untrusted\n",
+		"see why untrusted isn't running: journalctl --user -u claude-rc-untrusted\n",
+	} {
+		if !strings.Contains(out.String(), want) {
+			t.Errorf("output is missing %q:\n%s", want, out.String())
+		}
 	}
 }
 
@@ -121,7 +152,7 @@ func TestStatusSystemctlError(t *testing.T) {
 	dir := t.TempDir()
 	writeUnit(t, dir, "utils", "/home/a/utils")
 	runner := &fakeMachine{replies: map[string]reply{
-		isActiveCmd("utils"): {err: errors.New("systemctl not found")},
+		showCmd("utils"): {err: errors.New("systemctl not found")},
 	}}
 
 	err := (&Manager{unitDir: dir, machine: runner}).Status(&bytes.Buffer{})
