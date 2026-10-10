@@ -1,0 +1,18 @@
+#!/bin/sh
+case "$1" in
+auth)
+	echo '{"loggedIn": true}'
+	;;
+remote-control)
+	echo "$(pwd) $*" >>"$(dirname "$0")/calls.log"
+	if [ -e .fail ]; then
+		echo "Workspace not trusted" >&2
+		exit 1
+	fi
+	exec sleep infinity
+	;;
+*)
+	echo "fake claude: didn't expect: $*" >&2
+	exit 2
+	;;
+esac
