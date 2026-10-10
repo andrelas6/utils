@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"os"
-	"os/exec"
 	"path/filepath"
 
 	"github.com/andrelas6/utils/internal/remotecontrol"
@@ -39,12 +38,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	mgr := &remotecontrol.Manager{
-		UnitDir:  filepath.Join(configDir, "systemd", "user"),
-		Home:     home,
-		Runner:   remotecontrol.ExecRunner{},
-		LookPath: exec.LookPath,
-	}
+	mgr := remotecontrol.New(filepath.Join(configDir, "systemd", "user"), home)
 
 	if err := run(os.Args[1:], os.Stdout, os.Stderr, mgr); err != nil {
 		if errors.Is(err, errUsage) {

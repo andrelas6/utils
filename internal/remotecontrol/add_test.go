@@ -12,14 +12,14 @@ import (
 
 const claudePath = "/home/a/.local/bin/claude"
 
-func newTestManager(t *testing.T) (*Manager, *fakeRunner) {
+func newTestManager(t *testing.T) (*Manager, *fakeMachine) {
 	t.Helper()
-	runner := &fakeRunner{}
+	runner := &fakeMachine{}
 	return &Manager{
-		UnitDir: filepath.Join(t.TempDir(), "systemd", "user"),
-		Home:    t.TempDir(),
-		Runner:  runner,
-		LookPath: func(name string) (string, error) {
+		unitDir: filepath.Join(t.TempDir(), "systemd", "user"),
+		home:    t.TempDir(),
+		machine: runner,
+		lookPath: func(name string) (string, error) {
 			if name != "claude" {
 				return "", errors.New("unexpected lookup " + name)
 			}
@@ -39,7 +39,7 @@ func TestAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(svc.UnitDir, "claude-rc-utils.service"))
+	got, err := os.ReadFile(filepath.Join(svc.unitDir, "claude-rc-utils.service"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,6 +60,7 @@ func TestAdd(t *testing.T) {
 }
 
 type outputAtFirstCall struct {
+	realMachine
 	out  *bytes.Buffer
 	seen *string
 }
@@ -77,7 +78,7 @@ func TestAddRemindsBeforeStarting(t *testing.T) {
 	svc, _ := newTestManager(t)
 	var out bytes.Buffer
 	var beforeSystemctl string
-	svc.Runner = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
+	svc.machine = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
 
 	if err := svc.Add(&out, t.TempDir(), "utils", false); err != nil {
 		t.Fatal(err)
@@ -118,7 +119,7 @@ func TestAddRelativeRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(svc.UnitDir, "claude-rc-here.service"))
+	got, err := os.ReadFile(filepath.Join(svc.unitDir, "claude-rc-here.service"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,30 +132,49 @@ func TestAddRelativeRepo(t *testing.T) {
 // systemctl is never called.
 func TestAddRefuses(t *testing.T) {
 	tests := []struct {
-		name  string
-		setup func(t *testing.T, svc *Manager) (repo, name string)
-		want  string
+		name   string
+		setup  func(t *testing.T, svc *Manager) (repo, name string)
+		want   string
+		wantIs error
 	}{
 		{"missing folder", func(t *testing.T, svc *Manager) (string, string) {
 			return filepath.Join(t.TempDir(), "nope"), ""
-		}, "nope"},
+		}, "nope", os.ErrNotExist},
 		{"file, not folder", func(t *testing.T, svc *Manager) (string, string) {
 			file := filepath.Join(t.TempDir(), "notes.txt")
 			if err := os.WriteFile(file, nil, 0o644); err != nil {
 				t.Fatal(err)
 			}
 			return file, ""
-		}, "not a folder"},
+		}, "not a folder", nil},
 		{"home folder", func(t *testing.T, svc *Manager) (string, string) {
-			return svc.Home, "home"
-		}, "home folder"},
+			return svc.home, "home"
+		}, "home folder", nil},
+		{"link to home folder", func(t *testing.T, svc *Manager) (string, string) {
+			link := filepath.Join(t.TempDir(), "myhome")
+			if err := os.Symlink(svc.home, link); err != nil {
+				t.Fatal(err)
+			}
+			return link, "home"
+		}, "home folder", nil},
 		{"no usable name", func(t *testing.T, svc *Manager) (string, string) {
 			return t.TempDir(), "%%%"
-		}, "-name"},
-		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
-			svc.LookPath = func(string) (string, error) { return "", errors.New("not found") }
+		}, "-name", nil},
+		{"line break in repo path", func(t *testing.T, svc *Manager) (string, string) {
+			repo := filepath.Join(t.TempDir(), "two\nlines")
+			if err := os.Mkdir(repo, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			return repo, "two-lines"
+		}, "line break", nil},
+		{"space in claude path", func(t *testing.T, svc *Manager) (string, string) {
+			svc.lookPath = func(string) (string, error) { return "/tmp/my bin/claude", nil }
 			return t.TempDir(), "utils"
-		}, "claude"},
+		}, "space", nil},
+		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
+			svc.lookPath = func(string) (string, error) { return "", errors.New("not found") }
+			return t.TempDir(), "utils"
+		}, "claude", nil},
 	}
 
 	for _, tt := range tests {
@@ -166,7 +186,10 @@ func TestAddRefuses(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to mention %q", err, tt.want)
 			}
-			if _, statErr := os.Stat(svc.UnitDir); !errors.Is(statErr, os.ErrNotExist) {
+			if tt.wantIs != nil && !errors.Is(err, tt.wantIs) {
+				t.Errorf("err = %v, want it to be %v", err, tt.wantIs)
+			}
+			if _, statErr := os.Stat(svc.unitDir); !errors.Is(statErr, os.ErrNotExist) {
 				t.Errorf("unit folder was created")
 			}
 			if len(runner.calls) != 0 {
@@ -176,20 +199,41 @@ func TestAddRefuses(t *testing.T) {
 	}
 }
 
+// When the unit folder can't be read, add can't tell whether the repo is
+// already set up, so it stops and says so instead of trying to write.
+func TestAddCantCheckUnitFolder(t *testing.T) {
+	svc, runner := newTestManager(t)
+	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(svc.unitDir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(svc.unitDir, 0o755) })
+
+	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
+	if err == nil || !strings.Contains(err.Error(), "can't check") {
+		t.Fatalf("err = %v, want 'can't check'", err)
+	}
+	if len(runner.calls) != 0 {
+		t.Errorf("systemctl called: %q", runner.calls)
+	}
+}
+
 // Adding a name that is already set up is refused and leaves the existing
 // unit file as it was.
 func TestAddExistingUnit(t *testing.T) {
 	svc, runner := newTestManager(t)
-	if err := os.MkdirAll(svc.UnitDir, 0o755); err != nil {
+	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeUnit(t, svc.UnitDir, "utils", "/old/repo")
+	writeUnit(t, svc.unitDir, "utils", "/old/repo")
 
 	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
 	if err == nil || !strings.Contains(err.Error(), "already set up") {
 		t.Fatalf("err = %v, want 'already set up'", err)
 	}
-	got, _ := os.ReadFile(filepath.Join(svc.UnitDir, "claude-rc-utils.service"))
+	got, _ := os.ReadFile(filepath.Join(svc.unitDir, "claude-rc-utils.service"))
 	if !strings.Contains(string(got), "/old/repo") {
 		t.Errorf("existing unit file was changed:\n%s", got)
 	}
@@ -198,9 +242,9 @@ func TestAddExistingUnit(t *testing.T) {
 	}
 }
 
-// When systemctl fails, add returns an error naming the command and tells the
-// user how to undo the half-done setup.
-func TestAddSystemctlFails(t *testing.T) {
+// When systemctl fails, add undoes its work (disables the unit, deletes the
+// file, reloads systemd) and the error names the command and says it cleaned up.
+func TestAddSystemctlFailsRollsBack(t *testing.T) {
 	svc, runner := newTestManager(t)
 	runner.replies = map[string]reply{
 		"systemctl --user enable --now claude-rc-utils.service": {err: errors.New("Failed to connect to bus")},
@@ -210,10 +254,37 @@ func TestAddSystemctlFails(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected an error")
 	}
-	for _, want := range []string{"enable --now claude-rc-utils.service", "Failed to connect to bus", "claude-rc remove utils"} {
+	for _, want := range []string{"enable --now claude-rc-utils.service", "Failed to connect to bus", "removed again"} {
 		if !strings.Contains(err.Error(), want) {
 			t.Errorf("err = %v, want it to mention %q", err, want)
 		}
+	}
+	if _, err := os.Stat(filepath.Join(svc.unitDir, "claude-rc-utils.service")); !errors.Is(err, os.ErrNotExist) {
+		t.Errorf("unit file still there")
+	}
+	wantCalls := []string{
+		"systemctl --user daemon-reload",
+		"systemctl --user enable --now claude-rc-utils.service",
+		"systemctl --user disable --now claude-rc-utils.service",
+		"systemctl --user daemon-reload",
+	}
+	if !reflect.DeepEqual(runner.calls, wantCalls) {
+		t.Errorf("calls = %q, want %q", runner.calls, wantCalls)
+	}
+}
+
+// When the clean-up fails too, the error still tells the user how to undo
+// the half-done setup by hand.
+func TestAddRollbackFails(t *testing.T) {
+	svc, runner := newTestManager(t)
+	runner.replies = map[string]reply{
+		"systemctl --user enable --now claude-rc-utils.service":  {err: errors.New("Failed to connect to bus")},
+		"systemctl --user disable --now claude-rc-utils.service": {err: errors.New("Failed to connect to bus")},
+	}
+
+	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
+	if err == nil || !strings.Contains(err.Error(), "to undo, run: claude-rc remove utils") {
+		t.Fatalf("err = %v, want the manual undo hint", err)
 	}
 }
 
@@ -228,14 +299,14 @@ func TestAddDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(svc.UnitDir); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(svc.unitDir); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("unit folder was created")
 	}
 	if len(runner.calls) != 0 {
 		t.Errorf("systemctl called: %q", runner.calls)
 	}
 	for _, want := range []string{
-		filepath.Join(svc.UnitDir, "claude-rc-utils.service"),
+		filepath.Join(svc.unitDir, "claude-rc-utils.service"),
 		unitFileContent(repo, "utils", claudePath),
 		"would run: systemctl --user daemon-reload\n",
 		"would run: systemctl --user enable --now claude-rc-utils.service\n",
@@ -251,7 +322,7 @@ func TestAddDryRun(t *testing.T) {
 func TestAddDryRunStillRefuses(t *testing.T) {
 	svc, _ := newTestManager(t)
 
-	err := svc.Add(&bytes.Buffer{}, svc.Home, "home", true)
+	err := svc.Add(&bytes.Buffer{}, svc.home, "home", true)
 	if err == nil || !strings.Contains(err.Error(), "home folder") {
 		t.Fatalf("err = %v, want the home folder refusal", err)
 	}

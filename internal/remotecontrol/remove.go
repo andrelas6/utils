@@ -1,37 +1,34 @@
 package remotecontrol
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 )
 
-func (s *Manager) Remove(out io.Writer, name string, dryRun bool) error {
-	unknown := fmt.Errorf("no repo set up as %q, see claude-rc status", name)
+func (m *Manager) Remove(out io.Writer, name string, dryRun bool) error {
 	if cleaned, err := unitName("", name); err != nil || cleaned != name {
-		return unknown
+		return fmt.Errorf("%q isn't a valid name, see claude-rc status for the names", name)
 	}
 	unit := unitFileName(name)
-	unitPath := filepath.Join(s.UnitDir, unit)
-	if _, err := os.Stat(unitPath); err != nil {
-		return unknown
+	unitPath := filepath.Join(m.unitDir, unit)
+	if _, err := os.Stat(unitPath); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("no repo set up as %q, see claude-rc status", name)
+	} else if err != nil {
+		return fmt.Errorf("can't check %s: %w", unitPath, err)
 	}
 
-	runner := s.Runner
-	if dryRun {
-		runner = DryRunner{Out: out}
-	}
+	mc := m.machineFor(out, dryRun)
 
-	if _, err := runner.Run("systemctl", "--user", "disable", "--now", unit); err != nil {
+	if _, err := mc.Run("systemctl", "--user", "disable", "--now", unit); err != nil {
 		return fmt.Errorf("systemctl --user disable --now %s: %w", unit, err)
 	}
-	if dryRun {
-		fmt.Fprintf(out, "would delete: %s\n", unitPath)
-	} else if err := os.Remove(unitPath); err != nil {
+	if err := mc.Remove(unitPath); err != nil {
 		return fmt.Errorf("delete %q: %w", unitPath, err)
 	}
-	if _, err := runner.Run("systemctl", "--user", "daemon-reload"); err != nil {
+	if _, err := mc.Run("systemctl", "--user", "daemon-reload"); err != nil {
 		return fmt.Errorf("systemctl --user daemon-reload: %w", err)
 	}
 

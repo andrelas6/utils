@@ -11,58 +11,75 @@ import (
 	"text/tabwriter"
 )
 
-const (
-	unitPrefix = "claude-rc-"
-	unitSuffix = ".service"
-)
-
-type Manager struct {
-	UnitDir  string
-	Home     string
-	Runner   Runner
-	LookPath func(name string) (string, error)
+type unitInfo struct {
+	state, restarts, lastExit string
 }
 
-func (s *Manager) Status(out io.Writer) error {
-	units, err := filepath.Glob(filepath.Join(s.UnitDir, unitFileName("*")))
+func (m *Manager) Status(out io.Writer) error {
+	units, err := filepath.Glob(filepath.Join(m.unitDir, unitFileName("*")))
 	if err != nil {
-		return fmt.Errorf("list units in %q: %w", s.UnitDir, err)
+		return fmt.Errorf("list units in %q: %w", m.unitDir, err)
 	}
 
 	if len(units) == 0 {
 		fmt.Fprintln(out, "no repos set up")
 	} else {
+		var notes []string
 		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-		fmt.Fprintln(w, "NAME\tSTATE\tREPO")
+		fmt.Fprintln(w, "NAME\tSTATE\tRESTARTS\tLAST EXIT\tREPO")
 		for _, path := range units {
 			unit := filepath.Base(path)
-			state, err := s.unitState(unit)
-			if err != nil {
-				return err
-			}
 			name := strings.TrimSuffix(strings.TrimPrefix(unit, unitPrefix), unitSuffix)
-			fmt.Fprintf(w, "%s\t%s\t%s\n", name, state, repoOf(path))
+			st, err := m.unitState(unit)
+			switch {
+			case err != nil:
+				st = unitInfo{state: "unknown", restarts: "?", lastExit: "?"}
+				notes = append(notes, fmt.Sprintf("can't read %s's state: %v", name, err))
+			case st.state != "active":
+				notes = append(notes, fmt.Sprintf("see why %s isn't running: journalctl --user -u %s%s", name, unitPrefix, name))
+			}
+			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", name, st.state, st.restarts, st.lastExit, repoOf(path))
 		}
 		if err := w.Flush(); err != nil {
 			return err
 		}
+		if len(notes) > 0 {
+			fmt.Fprintf(out, "\n%s\n", strings.Join(notes, "\n"))
+		}
 	}
 
-	fmt.Fprintf(out, "\nlogged in: %s\n", s.loggedIn())
+	fmt.Fprintf(out, "\nlogged in: %s\n", m.loggedIn())
 	return nil
 }
 
-func (s *Manager) unitState(unit string) (string, error) {
-	out, err := s.Runner.Run("systemctl", "--user", "is-active", unit)
-	state := strings.TrimSpace(string(out))
-	if state == "" && err != nil {
-		return "", fmt.Errorf("systemctl --user is-active %s: %w", unit, err)
+func (m *Manager) unitState(unit string) (unitInfo, error) {
+	out, err := m.machine.Run("systemctl", "--user", "show", unit, "--property=ActiveState,SubState,NRestarts,ExecMainStatus")
+	if err != nil {
+		return unitInfo{}, fmt.Errorf("systemctl --user show %s: %w", unit, err)
 	}
-	return state, nil
+
+	props := map[string]string{}
+	for line := range strings.Lines(string(out)) {
+		if key, value, ok := strings.Cut(strings.TrimSpace(line), "="); ok {
+			props[key] = value
+		}
+	}
+	orUnknown := func(key string) string {
+		if v := props[key]; v != "" {
+			return v
+		}
+		return "?"
+	}
+
+	st := unitInfo{state: orUnknown("ActiveState"), restarts: orUnknown("NRestarts"), lastExit: orUnknown("ExecMainStatus")}
+	if props["SubState"] == "auto-restart" {
+		st.state = "restarting"
+	}
+	return st, nil
 }
 
-func (s *Manager) loggedIn() string {
-	out, _ := s.Runner.Run("claude", "auth", "status", "--json")
+func (m *Manager) loggedIn() string {
+	out, _ := m.machine.Run("claude", "auth", "status", "--json")
 	var auth struct {
 		LoggedIn *bool `json:"loggedIn"`
 	}

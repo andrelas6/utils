@@ -45,7 +45,20 @@ Flags go before the repo or name.
 
 **When something is wrong**
 
-- `claude-rc status` shows `failed` or keeps restarting: look at `journalctl --user -u claude-rc-<name>`.
+`claude-rc status` shows each repo's state, how often systemd restarted it and how it last exited, plus where to look for anything that isn't running:
+
+```
+NAME       STATE       RESTARTS  LAST EXIT  REPO
+untrusted  restarting  4         1          /home/me/workspace/untrusted
+utils      active      0         0          /home/me/workspace/utils
+
+see why untrusted isn't running: journalctl --user -u claude-rc-untrusted
+
+logged in: yes
+```
+
+- `restarting` or `failed`: claude keeps exiting; the `journalctl` line shows why. Usually the repo isn't trusted yet (run `claude remote-control` once in it) or the login expired.
+- `unknown`: `systemctl` couldn't be asked; the reason is printed under the table.
 - `logged in: no`: the Claude login expired. Run `claude auth login`; the services pick it up on their next restart.
 - Units live in `~/.config/systemd/user/claude-rc-<name>.service`. They start at login, not at boot.
 
