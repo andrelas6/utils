@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -146,17 +147,36 @@ func TestStatusLogin(t *testing.T) {
 	}
 }
 
-// When systemctl fails without printing a state, status returns an error that
-// names the unit.
-func TestStatusSystemctlError(t *testing.T) {
+// When systemctl can't read one unit, that row shows unknown with the reason
+// underneath, and the other repos are still listed.
+func TestStatusUnreadableUnit(t *testing.T) {
 	dir := t.TempDir()
 	writeUnit(t, dir, "utils", "/home/a/utils")
+	writeUnit(t, dir, "web", "/home/a/web")
 	runner := &fakeMachine{replies: map[string]reply{
-		showCmd("utils"): {err: errors.New("systemctl not found")},
+		showCmd("utils"): {err: errors.New("Failed to connect to bus")},
+		showCmd("web"):   showReply("active", "running", "0", "0"),
 	}}
+	var out bytes.Buffer
 
-	err := (&Manager{unitDir: dir, machine: runner}).Status(&bytes.Buffer{})
-	if err == nil || !strings.Contains(err.Error(), "claude-rc-utils.service") {
-		t.Fatalf("err = %v, want it to name claude-rc-utils.service", err)
+	if err := (&Manager{unitDir: dir, machine: runner}).Status(&out); err != nil {
+		t.Fatalf("status failed: %v", err)
+	}
+
+	rows := map[string][]string{}
+	for line := range strings.Lines(out.String()) {
+		if fields := strings.Fields(line); len(fields) == 5 {
+			rows[fields[0]] = fields
+		}
+	}
+	if got := rows["utils"]; !slices.Equal(got, []string{"utils", "unknown", "?", "?", "/home/a/utils"}) {
+		t.Errorf("utils row = %q", got)
+	}
+	if got := rows["web"]; !slices.Equal(got, []string{"web", "active", "0", "0", "/home/a/web"}) {
+		t.Errorf("web row = %q", got)
+	}
+	if !strings.Contains(out.String(), "can't read utils's state: systemctl --user show claude-rc-utils.service") ||
+		!strings.Contains(out.String(), "Failed to connect to bus") {
+		t.Errorf("no reason shown for utils:\n%s", out.String())
 	}
 }

@@ -24,29 +24,27 @@ func (m *Manager) Status(out io.Writer) error {
 	if len(units) == 0 {
 		fmt.Fprintln(out, "no repos set up")
 	} else {
-		var notRunning []string
+		var notes []string
 		w := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
 		fmt.Fprintln(w, "NAME\tSTATE\tRESTARTS\tLAST EXIT\tREPO")
 		for _, path := range units {
 			unit := filepath.Base(path)
 			name := strings.TrimSuffix(strings.TrimPrefix(unit, unitPrefix), unitSuffix)
 			st, err := m.unitState(unit)
-			if err != nil {
-				return err
-			}
-			if st.state != "active" {
-				notRunning = append(notRunning, name)
+			switch {
+			case err != nil:
+				st = unitInfo{state: "unknown", restarts: "?", lastExit: "?"}
+				notes = append(notes, fmt.Sprintf("can't read %s's state: %v", name, err))
+			case st.state != "active":
+				notes = append(notes, fmt.Sprintf("see why %s isn't running: journalctl --user -u %s%s", name, unitPrefix, name))
 			}
 			fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n", name, st.state, st.restarts, st.lastExit, repoOf(path))
 		}
 		if err := w.Flush(); err != nil {
 			return err
 		}
-		if len(notRunning) > 0 {
-			fmt.Fprintln(out)
-		}
-		for _, name := range notRunning {
-			fmt.Fprintf(out, "see why %s isn't running: journalctl --user -u %s%s\n", name, unitPrefix, name)
+		if len(notes) > 0 {
+			fmt.Fprintf(out, "\n%s\n", strings.Join(notes, "\n"))
 		}
 	}
 
