@@ -9,6 +9,8 @@ calls="$work/bin/calls.log"
 
 mkdir -p "$work/bin" "$work/healthy" "$work/broken"
 touch "$work/broken/.fail"
+line_break_repo="$work/two"$'\n'"lines"
+mkdir -p "$line_break_repo"
 cp "$here/fake-claude" "$work/bin/claude"
 chmod +x "$work/bin/claude"
 export PATH="$work/bin:$PATH"
@@ -74,6 +76,18 @@ keeps_failing() {
 	! is_active "$1" && [ "$(systemctl --user show --property=ExecMainStatus --value "$1")" = "1" ]
 }
 
+refused() {
+	! run_claude_rc "$@"
+}
+
+unit_count() {
+	find "$unit_dir" -maxdepth 1 -name 'claude-rc-*.service' 2>/dev/null | wc -l | tr -d ' '
+}
+
+has_units() {
+	[ "$(unit_count)" = "$1" ]
+}
+
 user_manager_answers() {
 	systemctl --user list-units --no-pager >/dev/null
 }
@@ -106,6 +120,20 @@ echo "systemd says: $(systemctl --user show --property=ActiveState,SubState,NRes
 check "status succeeds" run_claude_rc status
 check "status shows it restarting or failed, last exit 1" last_output_has "^broken +(restarting|activating|failed) +[0-9]+ +1 +"
 check "status says where to look" last_output_has "^see why broken isn't running: journalctl --user -u claude-rc-broken\$"
+
+echo
+echo "== refusals"
+check "add refuses the home folder" refused add "$HOME"
+check "  and says it's the home folder" last_output_has "home folder"
+check "add refuses a repo that's already set up" refused add "$work/healthy"
+check "  and says it's already set up" last_output_has "already set up"
+check "add refuses a path with a line break" refused add "$line_break_repo"
+check "  and says it has a line break" last_output_has "line break"
+check "remove refuses a name pointing outside the unit folder" refused remove ../healthy
+check "  and says it isn't a valid name" last_output_has "isn't a valid name"
+check "remove refuses a name that isn't set up" refused remove nope
+check "  and says it isn't set up" last_output_has 'no repo set up as "nope"'
+check "still exactly two units" has_units 2
 
 echo
 echo "$failures failed"
