@@ -8,6 +8,11 @@ import (
 	"strings"
 )
 
+const (
+	unitPrefix = "claude-rc-"
+	unitSuffix = ".service"
+)
+
 var notAllowedInName = regexp.MustCompile(`[^A-Za-z0-9._-]+`)
 
 func unitName(repo, name string) (string, error) {

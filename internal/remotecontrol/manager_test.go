@@ -10,8 +10,8 @@ func TestNew(t *testing.T) {
 	if m.unitDir != "/home/a/.config/systemd/user" || m.home != "/home/a" {
 		t.Errorf("folders = %q, %q", m.unitDir, m.home)
 	}
-	if _, ok := m.runner.(ExecRunner); !ok {
-		t.Errorf("runner = %T, want ExecRunner", m.runner)
+	if _, ok := m.machine.(realMachine); !ok {
+		t.Errorf("machine = %T, want realMachine", m.machine)
 	}
 	if m.lookPath == nil {
 		t.Error("lookPath is nil")

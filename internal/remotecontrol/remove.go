@@ -18,20 +18,15 @@ func (m *Manager) Remove(out io.Writer, name string, dryRun bool) error {
 		return unknown
 	}
 
-	runner := m.runner
-	if dryRun {
-		runner = DryRunner{Out: out}
-	}
+	mc := m.machineFor(out, dryRun)
 
-	if _, err := runner.Run("systemctl", "--user", "disable", "--now", unit); err != nil {
+	if _, err := mc.Run("systemctl", "--user", "disable", "--now", unit); err != nil {
 		return fmt.Errorf("systemctl --user disable --now %s: %w", unit, err)
 	}
-	if dryRun {
-		fmt.Fprintf(out, "would delete: %s\n", unitPath)
-	} else if err := os.Remove(unitPath); err != nil {
+	if err := mc.Remove(unitPath); err != nil {
 		return fmt.Errorf("delete %q: %w", unitPath, err)
 	}
-	if _, err := runner.Run("systemctl", "--user", "daemon-reload"); err != nil {
+	if _, err := mc.Run("systemctl", "--user", "daemon-reload"); err != nil {
 		return fmt.Errorf("systemctl --user daemon-reload: %w", err)
 	}
 

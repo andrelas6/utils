@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func newManagerWithUnit(t *testing.T, name string) (*Manager, *fakeRunner, string) {
+func newManagerWithUnit(t *testing.T, name string) (*Manager, *fakeMachine, string) {
 	t.Helper()
 	svc, runner := newTestManager(t)
 	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
