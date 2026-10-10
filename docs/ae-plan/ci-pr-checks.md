@@ -1,6 +1,6 @@
 # ae-plan: ci-pr-checks — every pull request runs the checks
 
-> **Status:** Draft
+> **Status:** Done
 > **Last updated:** 2026-10-10
 > **From:** ae-init `ci-pr-checks`
 
