@@ -88,6 +88,10 @@ has_units() {
 	[ "$(unit_count)" = "$1" ]
 }
 
+not_active() {
+	! is_active "$1"
+}
+
 user_manager_answers() {
 	systemctl --user list-units --no-pager >/dev/null
 }
@@ -134,6 +138,16 @@ check "  and says it isn't a valid name" last_output_has "isn't a valid name"
 check "remove refuses a name that isn't set up" refused remove nope
 check "  and says it isn't set up" last_output_has 'no repo set up as "nope"'
 check "still exactly two units" has_units 2
+
+echo
+echo "== remove"
+check "remove healthy succeeds" run_claude_rc remove healthy
+check "remove broken succeeds" run_claude_rc remove broken
+check "no unit files left" has_units 0
+check "healthy is no longer running" not_active claude-rc-healthy.service
+check "broken is no longer running" not_active claude-rc-broken.service
+check "status succeeds" run_claude_rc status
+check "status says nothing is set up" last_output_has "^no repos set up\$"
 
 echo
 echo "$failures failed"
