@@ -56,3 +56,33 @@ jobs:
           grep -qF "would run: systemctl --user enable --now claude-rc-repo.service" "$RUNNER_TEMP/add.txt"
 
           ./bin/lspm . | grep -q "go.mod"
+
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Build
+        run: make build
+
+      - name: Start a systemd user session
+        run: |
+          sudo loginctl enable-linger "$USER"
+          runtime_dir="/run/user/$(id -u)"
+          echo "XDG_RUNTIME_DIR=$runtime_dir" >> "$GITHUB_ENV"
+          for _ in $(seq 1 30); do
+            if XDG_RUNTIME_DIR="$runtime_dir" systemctl --user list-units --no-pager >/dev/null 2>&1; then
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "the systemd user manager didn't start"
+          exit 1
+
+      - name: End-to-end tests
+        run: e2e/run.sh
