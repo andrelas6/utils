@@ -159,6 +159,10 @@ func TestAddRefuses(t *testing.T) {
 			}
 			return repo, "two-lines"
 		}, "line break"},
+		{"space in claude path", func(t *testing.T, svc *Manager) (string, string) {
+			svc.lookPath = func(string) (string, error) { return "/tmp/my bin/claude", nil }
+			return t.TempDir(), "utils"
+		}, "space"},
 		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
 			svc.lookPath = func(string) (string, error) { return "", errors.New("not found") }
 			return t.TempDir(), "utils"

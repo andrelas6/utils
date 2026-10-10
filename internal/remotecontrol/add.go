@@ -31,6 +31,9 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	if err != nil {
 		return fmt.Errorf("can't find claude: %w", err)
 	}
+	if strings.ContainsAny(claude, " \t\n\r") {
+		return fmt.Errorf("claude is at %q; a space or line break in that path breaks the unit's ExecStart, so put claude (or a link to it) in a folder without one", claude)
+	}
 
 	content := unitFileContent(repo, name, claude)
 	mc := m.machineFor(out, dryRun)
