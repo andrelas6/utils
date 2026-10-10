@@ -1,4 +1,4 @@
-package rcservice
+package remotecontrol
 
 import (
 	"fmt"
@@ -7,7 +7,7 @@ import (
 	"path/filepath"
 )
 
-func (s *Service) Remove(out io.Writer, name string, dryRun bool) error {
+func (s *Manager) Remove(out io.Writer, name string, dryRun bool) error {
 	unknown := fmt.Errorf("no repo set up as %q, see claude-rc status", name)
 	if cleaned, err := unitName("", name); err != nil || cleaned != name {
 		return unknown

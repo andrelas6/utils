@@ -1,4 +1,4 @@
-package rcservice
+package remotecontrol
 
 import (
 	"fmt"
@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
-	repo, err := s.checkRepo(repo)
+func (s *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
+	repo, err := s.resolveRepo(repo)
 	if err != nil {
 		return err
 	}
@@ -29,7 +29,7 @@ func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
 		return fmt.Errorf("can't find claude: %w", err)
 	}
 
-	content := unitFile(repo, name, claude)
+	content := unitFileContent(repo, name, claude)
 	runner := s.Runner
 	if dryRun {
 		fmt.Fprintf(out, "would write: %s\n\n%s\n", unitPath, content)
@@ -61,7 +61,7 @@ func (s *Service) Add(out io.Writer, repo, name string, dryRun bool) error {
 	return nil
 }
 
-func (s *Service) checkRepo(repo string) (string, error) {
+func (s *Manager) resolveRepo(repo string) (string, error) {
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return "", fmt.Errorf("resolve %q: %w", repo, err)

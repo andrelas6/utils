@@ -1,4 +1,4 @@
-package rcservice
+package remotecontrol
 
 import (
 	"os"

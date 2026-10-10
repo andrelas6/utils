@@ -1,4 +1,4 @@
-package rcservice
+package remotecontrol
 
 import (
 	"bytes"
@@ -31,7 +31,7 @@ func TestStatusListsUnits(t *testing.T) {
 	}}
 	var out bytes.Buffer
 
-	if err := (&Service{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
+	if err := (&Manager{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -50,7 +50,7 @@ func TestStatusListsUnits(t *testing.T) {
 // that the unit file needs for systemd.
 func TestStatusUnescapesPercent(t *testing.T) {
 	dir := t.TempDir()
-	unit := unitFile("/home/a/My Repo%", "My-Repo", "/usr/bin/claude")
+	unit := unitFileContent("/home/a/My Repo%", "My-Repo", "/usr/bin/claude")
 	if err := os.WriteFile(filepath.Join(dir, unitFileName("My-Repo")), []byte(unit), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestStatusUnescapesPercent(t *testing.T) {
 	}}
 	var out bytes.Buffer
 
-	if err := (&Service{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
+	if err := (&Manager{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -75,7 +75,7 @@ func TestStatusNoUnits(t *testing.T) {
 		runner := &fakeRunner{replies: map[string]reply{authCmd: {out: `{"loggedIn": true}`}}}
 		var out bytes.Buffer
 
-		if err := (&Service{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
+		if err := (&Manager{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
 			t.Fatal(err)
 		}
 
@@ -105,7 +105,7 @@ func TestStatusLogin(t *testing.T) {
 			runner := &fakeRunner{replies: map[string]reply{authCmd: tt.reply}}
 			var out bytes.Buffer
 
-			if err := (&Service{UnitDir: t.TempDir(), Runner: runner}).Status(&out); err != nil {
+			if err := (&Manager{UnitDir: t.TempDir(), Runner: runner}).Status(&out); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.HasSuffix(out.String(), tt.want) {
@@ -124,7 +124,7 @@ func TestStatusSystemctlError(t *testing.T) {
 		isActiveCmd("utils"): {err: errors.New("systemctl not found")},
 	}}
 
-	err := (&Service{UnitDir: dir, Runner: runner}).Status(&bytes.Buffer{})
+	err := (&Manager{UnitDir: dir, Runner: runner}).Status(&bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "claude-rc-utils.service") {
 		t.Fatalf("err = %v, want it to name claude-rc-utils.service", err)
 	}

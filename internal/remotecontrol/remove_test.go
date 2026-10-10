@@ -1,4 +1,4 @@
-package rcservice
+package remotecontrol
 
 import (
 	"bytes"
@@ -10,9 +10,9 @@ import (
 	"testing"
 )
 
-func newServiceWithUnit(t *testing.T, name string) (*Service, *fakeRunner, string) {
+func newManagerWithUnit(t *testing.T, name string) (*Manager, *fakeRunner, string) {
 	t.Helper()
-	svc, runner := newTestService(t)
+	svc, runner := newTestManager(t)
 	if err := os.MkdirAll(svc.UnitDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -23,7 +23,7 @@ func newServiceWithUnit(t *testing.T, name string) (*Service, *fakeRunner, strin
 // Removing a set-up repo stops and disables its unit, deletes the unit file,
 // then reloads systemd.
 func TestRemove(t *testing.T) {
-	svc, runner, unitPath := newServiceWithUnit(t, "utils")
+	svc, runner, unitPath := newManagerWithUnit(t, "utils")
 	var out bytes.Buffer
 
 	if err := svc.Remove(&out, "utils", false); err != nil {
@@ -50,7 +50,7 @@ func TestRemove(t *testing.T) {
 func TestRemoveUnknown(t *testing.T) {
 	for _, name := range []string{"web", "../utils", "claude-rc-utils.service"} {
 		t.Run(name, func(t *testing.T) {
-			svc, runner, unitPath := newServiceWithUnit(t, "utils")
+			svc, runner, unitPath := newManagerWithUnit(t, "utils")
 
 			err := svc.Remove(&bytes.Buffer{}, name, false)
 			if err == nil || !strings.Contains(err.Error(), "claude-rc status") {
@@ -69,7 +69,7 @@ func TestRemoveUnknown(t *testing.T) {
 // When systemctl can't disable the unit, remove stops there: the unit file
 // is kept and systemd isn't reloaded.
 func TestRemoveDisableFails(t *testing.T) {
-	svc, runner, unitPath := newServiceWithUnit(t, "utils")
+	svc, runner, unitPath := newManagerWithUnit(t, "utils")
 	runner.replies = map[string]reply{
 		"systemctl --user disable --now claude-rc-utils.service": {err: errors.New("Failed to connect to bus")},
 	}
@@ -89,7 +89,7 @@ func TestRemoveDisableFails(t *testing.T) {
 // A dry run prints the systemctl commands and the file it would delete, but
 // keeps the unit file and runs nothing.
 func TestRemoveDryRun(t *testing.T) {
-	svc, runner, unitPath := newServiceWithUnit(t, "utils")
+	svc, runner, unitPath := newManagerWithUnit(t, "utils")
 	var out bytes.Buffer
 
 	if err := svc.Remove(&out, "utils", true); err != nil {
@@ -113,7 +113,7 @@ func TestRemoveDryRun(t *testing.T) {
 
 // A dry run for a name that isn't set up gives the same error as a real remove.
 func TestRemoveDryRunUnknown(t *testing.T) {
-	svc, _, _ := newServiceWithUnit(t, "utils")
+	svc, _, _ := newManagerWithUnit(t, "utils")
 
 	err := svc.Remove(&bytes.Buffer{}, "web", true)
 	if err == nil || !strings.Contains(err.Error(), "claude-rc status") {

@@ -1,4 +1,4 @@
-package rcservice
+package remotecontrol
 
 import (
 	"bufio"
@@ -16,14 +16,14 @@ const (
 	unitSuffix = ".service"
 )
 
-type Service struct {
+type Manager struct {
 	UnitDir  string
 	Home     string
 	Runner   Runner
 	LookPath func(name string) (string, error)
 }
 
-func (s *Service) Status(out io.Writer) error {
+func (s *Manager) Status(out io.Writer) error {
 	units, err := filepath.Glob(filepath.Join(s.UnitDir, unitFileName("*")))
 	if err != nil {
 		return fmt.Errorf("list units in %q: %w", s.UnitDir, err)
@@ -52,7 +52,7 @@ func (s *Service) Status(out io.Writer) error {
 	return nil
 }
 
-func (s *Service) unitState(unit string) (string, error) {
+func (s *Manager) unitState(unit string) (string, error) {
 	out, err := s.Runner.Run("systemctl", "--user", "is-active", unit)
 	state := strings.TrimSpace(string(out))
 	if state == "" && err != nil {
@@ -61,7 +61,7 @@ func (s *Service) unitState(unit string) (string, error) {
 	return state, nil
 }
 
-func (s *Service) loggedIn() string {
+func (s *Manager) loggedIn() string {
 	out, _ := s.Runner.Run("claude", "auth", "status", "--json")
 	var auth struct {
 		LoggedIn *bool `json:"loggedIn"`
