@@ -18,9 +18,12 @@ Makefile              # build, build-linux, install, test, clean
 
 Existing programs:
 
-| Program | What it does                                                       |
-| ------- | ------------------------------------------------------------------ |
-| `lspm`  | Lists a folder's contents with their permissions, owner and group. |
+| Program     | What it does                                                                                       |
+| ----------- | -------------------------------------------------------------------------------------------------- |
+| `lspm`      | Lists a folder's contents with their permissions, owner and group.                                 |
+| `claude-rc` | Sets up systemd user units that run `claude remote-control` per repo at login (`add`, `remove`, `status`). |
+
+`claude-rc` can't be run for real on macOS (no systemd): test logic with the fake runner in `internal/rcservice`, use `-dry-run` locally, and check real behaviour on Linux.
 
 ## Conventions
 
@@ -31,6 +34,7 @@ Existing programs:
 - Use build tags (`//go:build unix`, `//go:build linux`) for OS-specific code, with a fallback file so the module still compiles elsewhere.
 - Programs that delete, move or overwrite files must support a `-dry-run` flag.
 - Every `internal/` package has tests. Use `t.TempDir()` for filesystem tests.
+- Put a comment on top of every test function that explains the scenario it tests, in plain words (e.g. `// Bad arguments print the usage and never reach the services.`). This is the one exception to "no comments" in code.
 - When adding a program, add it to the table above and to `README.md`.
 
 ## Commands
@@ -57,4 +61,6 @@ Rules for agents:
 
 - Don't write feature code before an ae-plan exists and the user has asked to build.
 - Follow the plan's subtask order; write the failing test first, then the code that makes it pass.
+- Commit every ae-init, ae-plan and ae-review document with the change it describes: copy it from `~/.aecli/artifacts/utils/<ae-init|ae-plan|ae-review>/<slug>.md` to `docs/<ae-init|ae-plan|ae-review>/<slug>.md`, and update the copy whenever the doc changes. ae-review slugs are `pr-<number>`.
 - Don't commit or push unless the user asks.
+- Never add a `Co-Authored-By:` line (or any other AI attribution) to commit messages or PR descriptions.
