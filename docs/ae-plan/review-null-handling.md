@@ -1,6 +1,6 @@
 # ae-plan: review-null-handling — a Manager can't be built half-empty
 
-> **Status:** Draft
+> **Status:** Done
 > **Last updated:** 2026-10-10
 > **From:** ae-init `review-null-handling`
 
