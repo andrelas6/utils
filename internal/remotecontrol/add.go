@@ -61,6 +61,9 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 }
 
 func (m *Manager) resolveRepo(repo string) (string, error) {
+	if strings.ContainsAny(repo, "\n\r") {
+		return "", fmt.Errorf("%q has a line break in it, which a systemd unit can't hold; rename the folder", repo)
+	}
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return "", fmt.Errorf("resolve %q: %w", repo, err)

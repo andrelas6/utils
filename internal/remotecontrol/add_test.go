@@ -152,6 +152,13 @@ func TestAddRefuses(t *testing.T) {
 		{"no usable name", func(t *testing.T, svc *Manager) (string, string) {
 			return t.TempDir(), "%%%"
 		}, "-name"},
+		{"line break in repo path", func(t *testing.T, svc *Manager) (string, string) {
+			repo := filepath.Join(t.TempDir(), "two\nlines")
+			if err := os.Mkdir(repo, 0o755); err != nil {
+				t.Fatal(err)
+			}
+			return repo, "two-lines"
+		}, "line break"},
 		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
 			svc.lookPath = func(string) (string, error) { return "", errors.New("not found") }
 			return t.TempDir(), "utils"
