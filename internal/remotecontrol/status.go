@@ -6,32 +6,10 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
 )
-
-const (
-	unitPrefix = "claude-rc-"
-	unitSuffix = ".service"
-)
-
-type Manager struct {
-	unitDir  string
-	home     string
-	runner   Runner
-	lookPath func(name string) (string, error)
-}
-
-func New(unitDir, home string) *Manager {
-	return &Manager{
-		unitDir:  unitDir,
-		home:     home,
-		runner:   ExecRunner{},
-		lookPath: exec.LookPath,
-	}
-}
 
 func (m *Manager) Status(out io.Writer) error {
 	units, err := filepath.Glob(filepath.Join(m.unitDir, unitFileName("*")))
