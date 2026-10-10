@@ -177,6 +177,27 @@ func TestAddRefuses(t *testing.T) {
 	}
 }
 
+// When the unit folder can't be read, add can't tell whether the repo is
+// already set up, so it stops and says so instead of trying to write.
+func TestAddCantCheckUnitFolder(t *testing.T) {
+	svc, runner := newTestManager(t)
+	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(svc.unitDir, 0); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { os.Chmod(svc.unitDir, 0o755) })
+
+	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
+	if err == nil || !strings.Contains(err.Error(), "can't check") {
+		t.Fatalf("err = %v, want 'can't check'", err)
+	}
+	if len(runner.calls) != 0 {
+		t.Errorf("systemctl called: %q", runner.calls)
+	}
+}
+
 // Adding a name that is already set up is refused and leaves the existing
 // unit file as it was.
 func TestAddExistingUnit(t *testing.T) {

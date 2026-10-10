@@ -1,6 +1,7 @@
 package remotecontrol
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -22,6 +23,8 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	unitPath := filepath.Join(m.unitDir, unit)
 	if _, err := os.Stat(unitPath); err == nil {
 		return fmt.Errorf("%s is already set up (%s), remove it first", name, unitPath)
+	} else if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("can't check %s: %w", unitPath, err)
 	}
 
 	claude, err := m.lookPath("claude")
