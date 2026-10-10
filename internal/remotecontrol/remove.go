@@ -1,6 +1,7 @@
 package remotecontrol
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -8,14 +9,15 @@ import (
 )
 
 func (m *Manager) Remove(out io.Writer, name string, dryRun bool) error {
-	unknown := fmt.Errorf("no repo set up as %q, see claude-rc status", name)
 	if cleaned, err := unitName("", name); err != nil || cleaned != name {
-		return unknown
+		return fmt.Errorf("%q isn't a valid name, see claude-rc status for the names", name)
 	}
 	unit := unitFileName(name)
 	unitPath := filepath.Join(m.unitDir, unit)
-	if _, err := os.Stat(unitPath); err != nil {
-		return unknown
+	if _, err := os.Stat(unitPath); errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("no repo set up as %q, see claude-rc status", name)
+	} else if err != nil {
+		return fmt.Errorf("can't check %s: %w", unitPath, err)
 	}
 
 	mc := m.machineFor(out, dryRun)

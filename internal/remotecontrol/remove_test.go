@@ -45,20 +45,41 @@ func TestRemove(t *testing.T) {
 	}
 }
 
-// Removing a name that isn't set up, or a name that tries to point outside the
-// unit folder, is an error and touches nothing.
-func TestRemoveUnknown(t *testing.T) {
-	for _, name := range []string{"web", "../utils", "claude-rc-utils.service"} {
-		t.Run(name, func(t *testing.T) {
-			svc, runner, unitPath := newManagerWithUnit(t, "utils")
+// Each reason remove can't go ahead gets its own message: a name that tries to
+// point outside the unit folder, a name that isn't set up, and a unit folder
+// that can't be checked. None of them touch anything.
+func TestRemoveRefuses(t *testing.T) {
+	tests := []struct {
+		name  string
+		setup func(t *testing.T, m *Manager)
+		want  string
+	}{
+		{"../utils", nil, `"../utils" isn't a valid name`},
+		{"web", nil, `no repo set up as "web", see claude-rc status`},
+		{"claude-rc-utils.service", nil, `no repo set up as "claude-rc-utils.service"`},
+		{"utils", func(t *testing.T, m *Manager) {
+			if err := os.Chmod(m.unitDir, 0); err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { os.Chmod(m.unitDir, 0o755) })
+		}, "can't check"},
+	}
 
-			err := svc.Remove(&bytes.Buffer{}, name, false)
-			if err == nil || !strings.Contains(err.Error(), "claude-rc status") {
-				t.Fatalf("err = %v, want a pointer to claude-rc status", err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			svc, runner, unitPath := newManagerWithUnit(t, "utils")
+			if tt.setup != nil {
+				tt.setup(t, svc)
+			}
+
+			err := svc.Remove(&bytes.Buffer{}, tt.name, false)
+			if err == nil || !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("err = %v, want it to contain %q", err, tt.want)
 			}
 			if len(runner.calls) != 0 {
 				t.Errorf("systemctl called: %q", runner.calls)
 			}
+			os.Chmod(svc.unitDir, 0o755)
 			if _, err := os.Stat(unitPath); err != nil {
 				t.Errorf("existing unit file was touched: %v", err)
 			}
