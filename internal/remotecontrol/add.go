@@ -44,7 +44,11 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 		{"--user", "enable", "--now", unit},
 	} {
 		if _, err := mc.Run("systemctl", args...); err != nil {
-			return fmt.Errorf("systemctl %s: %w (to undo, run: claude-rc remove %s)", strings.Join(args, " "), err, name)
+			failed := fmt.Errorf("systemctl %s: %w", strings.Join(args, " "), err)
+			if m.Remove(io.Discard, name, dryRun) != nil {
+				return fmt.Errorf("%w (to undo, run: claude-rc remove %s)", failed, name)
+			}
+			return fmt.Errorf("%w (the unit was removed again)", failed)
 		}
 	}
 
