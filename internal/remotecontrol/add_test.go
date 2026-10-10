@@ -16,10 +16,10 @@ func newTestManager(t *testing.T) (*Manager, *fakeRunner) {
 	t.Helper()
 	runner := &fakeRunner{}
 	return &Manager{
-		UnitDir: filepath.Join(t.TempDir(), "systemd", "user"),
-		Home:    t.TempDir(),
-		Runner:  runner,
-		LookPath: func(name string) (string, error) {
+		unitDir: filepath.Join(t.TempDir(), "systemd", "user"),
+		home:    t.TempDir(),
+		runner:  runner,
+		lookPath: func(name string) (string, error) {
 			if name != "claude" {
 				return "", errors.New("unexpected lookup " + name)
 			}
@@ -39,7 +39,7 @@ func TestAdd(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(svc.UnitDir, "claude-rc-utils.service"))
+	got, err := os.ReadFile(filepath.Join(svc.unitDir, "claude-rc-utils.service"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +77,7 @@ func TestAddRemindsBeforeStarting(t *testing.T) {
 	svc, _ := newTestManager(t)
 	var out bytes.Buffer
 	var beforeSystemctl string
-	svc.Runner = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
+	svc.runner = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
 
 	if err := svc.Add(&out, t.TempDir(), "utils", false); err != nil {
 		t.Fatal(err)
@@ -118,7 +118,7 @@ func TestAddRelativeRepo(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	got, err := os.ReadFile(filepath.Join(svc.UnitDir, "claude-rc-here.service"))
+	got, err := os.ReadFile(filepath.Join(svc.unitDir, "claude-rc-here.service"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,13 +146,13 @@ func TestAddRefuses(t *testing.T) {
 			return file, ""
 		}, "not a folder"},
 		{"home folder", func(t *testing.T, svc *Manager) (string, string) {
-			return svc.Home, "home"
+			return svc.home, "home"
 		}, "home folder"},
 		{"no usable name", func(t *testing.T, svc *Manager) (string, string) {
 			return t.TempDir(), "%%%"
 		}, "-name"},
 		{"claude not found", func(t *testing.T, svc *Manager) (string, string) {
-			svc.LookPath = func(string) (string, error) { return "", errors.New("not found") }
+			svc.lookPath = func(string) (string, error) { return "", errors.New("not found") }
 			return t.TempDir(), "utils"
 		}, "claude"},
 	}
@@ -166,7 +166,7 @@ func TestAddRefuses(t *testing.T) {
 			if err == nil || !strings.Contains(err.Error(), tt.want) {
 				t.Fatalf("err = %v, want it to mention %q", err, tt.want)
 			}
-			if _, statErr := os.Stat(svc.UnitDir); !errors.Is(statErr, os.ErrNotExist) {
+			if _, statErr := os.Stat(svc.unitDir); !errors.Is(statErr, os.ErrNotExist) {
 				t.Errorf("unit folder was created")
 			}
 			if len(runner.calls) != 0 {
@@ -180,16 +180,16 @@ func TestAddRefuses(t *testing.T) {
 // unit file as it was.
 func TestAddExistingUnit(t *testing.T) {
 	svc, runner := newTestManager(t)
-	if err := os.MkdirAll(svc.UnitDir, 0o755); err != nil {
+	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeUnit(t, svc.UnitDir, "utils", "/old/repo")
+	writeUnit(t, svc.unitDir, "utils", "/old/repo")
 
 	err := svc.Add(&bytes.Buffer{}, t.TempDir(), "utils", false)
 	if err == nil || !strings.Contains(err.Error(), "already set up") {
 		t.Fatalf("err = %v, want 'already set up'", err)
 	}
-	got, _ := os.ReadFile(filepath.Join(svc.UnitDir, "claude-rc-utils.service"))
+	got, _ := os.ReadFile(filepath.Join(svc.unitDir, "claude-rc-utils.service"))
 	if !strings.Contains(string(got), "/old/repo") {
 		t.Errorf("existing unit file was changed:\n%s", got)
 	}
@@ -228,14 +228,14 @@ func TestAddDryRun(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if _, err := os.Stat(svc.UnitDir); !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Stat(svc.unitDir); !errors.Is(err, os.ErrNotExist) {
 		t.Errorf("unit folder was created")
 	}
 	if len(runner.calls) != 0 {
 		t.Errorf("systemctl called: %q", runner.calls)
 	}
 	for _, want := range []string{
-		filepath.Join(svc.UnitDir, "claude-rc-utils.service"),
+		filepath.Join(svc.unitDir, "claude-rc-utils.service"),
 		unitFileContent(repo, "utils", claudePath),
 		"would run: systemctl --user daemon-reload\n",
 		"would run: systemctl --user enable --now claude-rc-utils.service\n",
@@ -251,7 +251,7 @@ func TestAddDryRun(t *testing.T) {
 func TestAddDryRunStillRefuses(t *testing.T) {
 	svc, _ := newTestManager(t)
 
-	err := svc.Add(&bytes.Buffer{}, svc.Home, "home", true)
+	err := svc.Add(&bytes.Buffer{}, svc.home, "home", true)
 	if err == nil || !strings.Contains(err.Error(), "home folder") {
 		t.Fatalf("err = %v, want the home folder refusal", err)
 	}

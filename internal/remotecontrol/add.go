@@ -8,8 +8,8 @@ import (
 	"strings"
 )
 
-func (s *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
-	repo, err := s.resolveRepo(repo)
+func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
+	repo, err := m.resolveRepo(repo)
 	if err != nil {
 		return err
 	}
@@ -19,24 +19,24 @@ func (s *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	}
 
 	unit := unitFileName(name)
-	unitPath := filepath.Join(s.UnitDir, unit)
+	unitPath := filepath.Join(m.unitDir, unit)
 	if _, err := os.Stat(unitPath); err == nil {
 		return fmt.Errorf("%s is already set up (%s), remove it first", name, unitPath)
 	}
 
-	claude, err := s.LookPath("claude")
+	claude, err := m.lookPath("claude")
 	if err != nil {
 		return fmt.Errorf("can't find claude: %w", err)
 	}
 
 	content := unitFileContent(repo, name, claude)
-	runner := s.Runner
+	runner := m.runner
 	if dryRun {
 		fmt.Fprintf(out, "would write: %s\n\n%s\n", unitPath, content)
 		runner = DryRunner{Out: out}
 	} else {
-		if err := os.MkdirAll(s.UnitDir, 0o755); err != nil {
-			return fmt.Errorf("create %q: %w", s.UnitDir, err)
+		if err := os.MkdirAll(m.unitDir, 0o755); err != nil {
+			return fmt.Errorf("create %q: %w", m.unitDir, err)
 		}
 		if err := os.WriteFile(unitPath, []byte(content), 0o644); err != nil {
 			return fmt.Errorf("write %q: %w", unitPath, err)
@@ -61,7 +61,7 @@ func (s *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	return nil
 }
 
-func (s *Manager) resolveRepo(repo string) (string, error) {
+func (m *Manager) resolveRepo(repo string) (string, error) {
 	abs, err := filepath.Abs(repo)
 	if err != nil {
 		return "", fmt.Errorf("resolve %q: %w", repo, err)
@@ -73,7 +73,7 @@ func (s *Manager) resolveRepo(repo string) (string, error) {
 	if !info.IsDir() {
 		return "", fmt.Errorf("%s is not a folder", abs)
 	}
-	if abs == filepath.Clean(s.Home) {
+	if abs == filepath.Clean(m.home) {
 		return "", fmt.Errorf("%s is your home folder; claude never saves trust there, pick a repo", abs)
 	}
 	return abs, nil

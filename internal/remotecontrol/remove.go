@@ -7,18 +7,18 @@ import (
 	"path/filepath"
 )
 
-func (s *Manager) Remove(out io.Writer, name string, dryRun bool) error {
+func (m *Manager) Remove(out io.Writer, name string, dryRun bool) error {
 	unknown := fmt.Errorf("no repo set up as %q, see claude-rc status", name)
 	if cleaned, err := unitName("", name); err != nil || cleaned != name {
 		return unknown
 	}
 	unit := unitFileName(name)
-	unitPath := filepath.Join(s.UnitDir, unit)
+	unitPath := filepath.Join(m.unitDir, unit)
 	if _, err := os.Stat(unitPath); err != nil {
 		return unknown
 	}
 
-	runner := s.Runner
+	runner := m.runner
 	if dryRun {
 		runner = DryRunner{Out: out}
 	}

@@ -13,11 +13,11 @@ import (
 func newManagerWithUnit(t *testing.T, name string) (*Manager, *fakeRunner, string) {
 	t.Helper()
 	svc, runner := newTestManager(t)
-	if err := os.MkdirAll(svc.UnitDir, 0o755); err != nil {
+	if err := os.MkdirAll(svc.unitDir, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	writeUnit(t, svc.UnitDir, name, "/home/a/"+name)
-	return svc, runner, filepath.Join(svc.UnitDir, unitFileName(name))
+	writeUnit(t, svc.unitDir, name, "/home/a/"+name)
+	return svc, runner, filepath.Join(svc.unitDir, unitFileName(name))
 }
 
 // Removing a set-up repo stops and disables its unit, deletes the unit file,

@@ -7,13 +7,13 @@ import "testing"
 func TestNew(t *testing.T) {
 	m := New("/home/a/.config/systemd/user", "/home/a")
 
-	if m.UnitDir != "/home/a/.config/systemd/user" || m.Home != "/home/a" {
-		t.Errorf("folders = %q, %q", m.UnitDir, m.Home)
+	if m.unitDir != "/home/a/.config/systemd/user" || m.home != "/home/a" {
+		t.Errorf("folders = %q, %q", m.unitDir, m.home)
 	}
-	if _, ok := m.Runner.(ExecRunner); !ok {
-		t.Errorf("runner = %T, want ExecRunner", m.Runner)
+	if _, ok := m.runner.(ExecRunner); !ok {
+		t.Errorf("runner = %T, want ExecRunner", m.runner)
 	}
-	if m.LookPath == nil {
-		t.Error("LookPath is nil")
+	if m.lookPath == nil {
+		t.Error("lookPath is nil")
 	}
 }

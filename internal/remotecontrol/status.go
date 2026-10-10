@@ -18,25 +18,25 @@ const (
 )
 
 type Manager struct {
-	UnitDir  string
-	Home     string
-	Runner   Runner
-	LookPath func(name string) (string, error)
+	unitDir  string
+	home     string
+	runner   Runner
+	lookPath func(name string) (string, error)
 }
 
 func New(unitDir, home string) *Manager {
 	return &Manager{
-		UnitDir:  unitDir,
-		Home:     home,
-		Runner:   ExecRunner{},
-		LookPath: exec.LookPath,
+		unitDir:  unitDir,
+		home:     home,
+		runner:   ExecRunner{},
+		lookPath: exec.LookPath,
 	}
 }
 
-func (s *Manager) Status(out io.Writer) error {
-	units, err := filepath.Glob(filepath.Join(s.UnitDir, unitFileName("*")))
+func (m *Manager) Status(out io.Writer) error {
+	units, err := filepath.Glob(filepath.Join(m.unitDir, unitFileName("*")))
 	if err != nil {
-		return fmt.Errorf("list units in %q: %w", s.UnitDir, err)
+		return fmt.Errorf("list units in %q: %w", m.unitDir, err)
 	}
 
 	if len(units) == 0 {
@@ -46,7 +46,7 @@ func (s *Manager) Status(out io.Writer) error {
 		fmt.Fprintln(w, "NAME\tSTATE\tREPO")
 		for _, path := range units {
 			unit := filepath.Base(path)
-			state, err := s.unitState(unit)
+			state, err := m.unitState(unit)
 			if err != nil {
 				return err
 			}
@@ -58,12 +58,12 @@ func (s *Manager) Status(out io.Writer) error {
 		}
 	}
 
-	fmt.Fprintf(out, "\nlogged in: %s\n", s.loggedIn())
+	fmt.Fprintf(out, "\nlogged in: %s\n", m.loggedIn())
 	return nil
 }
 
-func (s *Manager) unitState(unit string) (string, error) {
-	out, err := s.Runner.Run("systemctl", "--user", "is-active", unit)
+func (m *Manager) unitState(unit string) (string, error) {
+	out, err := m.runner.Run("systemctl", "--user", "is-active", unit)
 	state := strings.TrimSpace(string(out))
 	if state == "" && err != nil {
 		return "", fmt.Errorf("systemctl --user is-active %s: %w", unit, err)
@@ -71,8 +71,8 @@ func (s *Manager) unitState(unit string) (string, error) {
 	return state, nil
 }
 
-func (s *Manager) loggedIn() string {
-	out, _ := s.Runner.Run("claude", "auth", "status", "--json")
+func (m *Manager) loggedIn() string {
+	out, _ := m.runner.Run("claude", "auth", "status", "--json")
 	var auth struct {
 		LoggedIn *bool `json:"loggedIn"`
 	}
