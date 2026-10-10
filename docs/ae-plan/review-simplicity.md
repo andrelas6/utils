@@ -1,6 +1,6 @@
 # ae-plan: review-simplicity — dry run is one swap, Manager has its own file
 
-> **Status:** Draft
+> **Status:** Done
 > **Last updated:** 2026-10-10
 > **From:** ae-init `review-simplicity`
 
