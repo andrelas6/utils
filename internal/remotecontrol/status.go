@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"text/tabwriter"
@@ -21,6 +22,15 @@ type Manager struct {
 	Home     string
 	Runner   Runner
 	LookPath func(name string) (string, error)
+}
+
+func New(unitDir, home string) *Manager {
+	return &Manager{
+		UnitDir:  unitDir,
+		Home:     home,
+		Runner:   ExecRunner{},
+		LookPath: exec.LookPath,
+	}
 }
 
 func (s *Manager) Status(out io.Writer) error {
