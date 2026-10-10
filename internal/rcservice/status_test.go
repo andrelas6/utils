@@ -46,6 +46,28 @@ func TestStatusListsUnits(t *testing.T) {
 	}
 }
 
+// A repo path with a % is shown as the real path, not with the doubled %%
+// that the unit file needs for systemd.
+func TestStatusUnescapesPercent(t *testing.T) {
+	dir := t.TempDir()
+	unit := unitFile("/home/a/My Repo%", "My-Repo", "/usr/bin/claude")
+	if err := os.WriteFile(filepath.Join(dir, unitFileName("My-Repo")), []byte(unit), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	runner := &fakeRunner{replies: map[string]reply{
+		isActiveCmd("My-Repo"): {out: "active\n"},
+	}}
+	var out bytes.Buffer
+
+	if err := (&Service{UnitDir: dir, Runner: runner}).Status(&out); err != nil {
+		t.Fatal(err)
+	}
+
+	if !strings.Contains(out.String(), "/home/a/My Repo%\n") {
+		t.Errorf("repo not shown as /home/a/My Repo%%:\n%s", out.String())
+	}
+}
+
 // With no units, or no unit folder at all, status says nothing is set up
 // and still reports the login.
 func TestStatusNoUnits(t *testing.T) {

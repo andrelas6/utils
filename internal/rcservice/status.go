@@ -85,7 +85,7 @@ func repoOf(unitPath string) string {
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
 		if repo, ok := strings.CutPrefix(scanner.Text(), "WorkingDirectory="); ok {
-			return repo
+			return strings.ReplaceAll(repo, "%%", "%")
 		}
 	}
 	return "?"
