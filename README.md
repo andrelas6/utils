@@ -25,6 +25,8 @@ make test
 ./bin/lspm /etc
 ```
 
+Every pull request runs formatting, `go vet`, the tests, the Linux build and a smoke test on Ubuntu and macOS (`.github/workflows/checks.yml`).
+
 ## claude-rc
 
 Runs `claude remote-control` in each repo you add, as a systemd user service that starts when you log in and restarts a minute after it stops. You then open the sessions from claude.ai/code or the Claude mobile app.
