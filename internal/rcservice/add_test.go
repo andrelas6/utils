@@ -43,7 +43,7 @@ func TestAdd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if want := unitFile(repo, "utils", claudePath); string(got) != want {
+	if want := unitFileContent(repo, "utils", claudePath); string(got) != want {
 		t.Errorf("unit file:\n%s\nwant:\n%s", got, want)
 	}
 
@@ -236,7 +236,7 @@ func TestAddDryRun(t *testing.T) {
 	}
 	for _, want := range []string{
 		filepath.Join(svc.UnitDir, "claude-rc-utils.service"),
-		unitFile(repo, "utils", claudePath),
+		unitFileContent(repo, "utils", claudePath),
 		"would run: systemctl --user daemon-reload\n",
 		"would run: systemctl --user enable --now claude-rc-utils.service\n",
 	} {

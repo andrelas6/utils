@@ -50,7 +50,7 @@ func TestStatusListsUnits(t *testing.T) {
 // that the unit file needs for systemd.
 func TestStatusUnescapesPercent(t *testing.T) {
 	dir := t.TempDir()
-	unit := unitFile("/home/a/My Repo%", "My-Repo", "/usr/bin/claude")
+	unit := unitFileContent("/home/a/My Repo%", "My-Repo", "/usr/bin/claude")
 	if err := os.WriteFile(filepath.Join(dir, unitFileName("My-Repo")), []byte(unit), 0o644); err != nil {
 		t.Fatal(err)
 	}

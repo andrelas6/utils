@@ -9,7 +9,7 @@ import (
 // host and name as the session name, default permissions, a restart every
 // minute, and starts at login.
 func TestUnitFile(t *testing.T) {
-	got := unitFile("/home/a/work/utils", "utils", "/home/a/.local/bin/claude")
+	got := unitFileContent("/home/a/work/utils", "utils", "/home/a/.local/bin/claude")
 
 	want := `[Unit]
 Description=Claude Remote Control for utils (/home/a/work/utils)
@@ -31,7 +31,7 @@ WantedBy=default.target
 // A % in a path is doubled so systemd doesn't read it as one of its own
 // placeholders like %H.
 func TestUnitFileEscapesPercent(t *testing.T) {
-	got := unitFile("/home/a/100%", "x", "/opt/50%/claude")
+	got := unitFileContent("/home/a/100%", "x", "/opt/50%/claude")
 
 	for _, want := range []string{
 		"WorkingDirectory=/home/a/100%%\n",

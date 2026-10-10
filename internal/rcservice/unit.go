@@ -25,7 +25,7 @@ func unitFileName(name string) string {
 	return unitPrefix + name + unitSuffix
 }
 
-func unitFile(repo, name, claudePath string) string {
+func unitFileContent(repo, name, claudePath string) string {
 	repo = escapePercent(repo)
 	claudePath = escapePercent(claudePath)
 	return fmt.Sprintf(`[Unit]
