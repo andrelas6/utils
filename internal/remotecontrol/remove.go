@@ -18,9 +18,9 @@ func (m *Manager) Remove(out io.Writer, name string, dryRun bool) error {
 		return unknown
 	}
 
-	runner := m.runner
+	runner := m.machine
 	if dryRun {
-		runner = DryRunner{Out: out}
+		runner = dryRunMachine{out: out}
 	}
 
 	if _, err := runner.Run("systemctl", "--user", "disable", "--now", unit); err != nil {

@@ -41,7 +41,7 @@ func (m *Manager) Status(out io.Writer) error {
 }
 
 func (m *Manager) unitState(unit string) (string, error) {
-	out, err := m.runner.Run("systemctl", "--user", "is-active", unit)
+	out, err := m.machine.Run("systemctl", "--user", "is-active", unit)
 	state := strings.TrimSpace(string(out))
 	if state == "" && err != nil {
 		return "", fmt.Errorf("systemctl --user is-active %s: %w", unit, err)
@@ -50,7 +50,7 @@ func (m *Manager) unitState(unit string) (string, error) {
 }
 
 func (m *Manager) loggedIn() string {
-	out, _ := m.runner.Run("claude", "auth", "status", "--json")
+	out, _ := m.machine.Run("claude", "auth", "status", "--json")
 	var auth struct {
 		LoggedIn *bool `json:"loggedIn"`
 	}

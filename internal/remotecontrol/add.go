@@ -30,10 +30,10 @@ func (m *Manager) Add(out io.Writer, repo, name string, dryRun bool) error {
 	}
 
 	content := unitFileContent(repo, name, claude)
-	runner := m.runner
+	runner := m.machine
 	if dryRun {
 		fmt.Fprintf(out, "would write: %s\n\n%s\n", unitPath, content)
-		runner = DryRunner{Out: out}
+		runner = dryRunMachine{out: out}
 	} else {
 		if err := os.MkdirAll(m.unitDir, 0o755); err != nil {
 			return fmt.Errorf("create %q: %w", m.unitDir, err)

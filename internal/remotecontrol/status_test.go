@@ -24,14 +24,14 @@ func TestStatusListsUnits(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "other.service"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	runner := &fakeRunner{replies: map[string]reply{
+	runner := &fakeMachine{replies: map[string]reply{
 		isActiveCmd("utils"): {out: "active\n"},
 		isActiveCmd("web"):   {out: "failed\n", err: errors.New("exit status 3")},
 		authCmd:              {out: `{"loggedIn": true}`},
 	}}
 	var out bytes.Buffer
 
-	if err := (&Manager{unitDir: dir, runner: runner}).Status(&out); err != nil {
+	if err := (&Manager{unitDir: dir, machine: runner}).Status(&out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,12 +54,12 @@ func TestStatusUnescapesPercent(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, unitFileName("My-Repo")), []byte(unit), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	runner := &fakeRunner{replies: map[string]reply{
+	runner := &fakeMachine{replies: map[string]reply{
 		isActiveCmd("My-Repo"): {out: "active\n"},
 	}}
 	var out bytes.Buffer
 
-	if err := (&Manager{unitDir: dir, runner: runner}).Status(&out); err != nil {
+	if err := (&Manager{unitDir: dir, machine: runner}).Status(&out); err != nil {
 		t.Fatal(err)
 	}
 
@@ -72,10 +72,10 @@ func TestStatusUnescapesPercent(t *testing.T) {
 // and still reports the login.
 func TestStatusNoUnits(t *testing.T) {
 	for _, dir := range []string{t.TempDir(), filepath.Join(t.TempDir(), "missing")} {
-		runner := &fakeRunner{replies: map[string]reply{authCmd: {out: `{"loggedIn": true}`}}}
+		runner := &fakeMachine{replies: map[string]reply{authCmd: {out: `{"loggedIn": true}`}}}
 		var out bytes.Buffer
 
-		if err := (&Manager{unitDir: dir, runner: runner}).Status(&out); err != nil {
+		if err := (&Manager{unitDir: dir, machine: runner}).Status(&out); err != nil {
 			t.Fatal(err)
 		}
 
@@ -102,10 +102,10 @@ func TestStatusLogin(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runner := &fakeRunner{replies: map[string]reply{authCmd: tt.reply}}
+			runner := &fakeMachine{replies: map[string]reply{authCmd: tt.reply}}
 			var out bytes.Buffer
 
-			if err := (&Manager{unitDir: t.TempDir(), runner: runner}).Status(&out); err != nil {
+			if err := (&Manager{unitDir: t.TempDir(), machine: runner}).Status(&out); err != nil {
 				t.Fatal(err)
 			}
 			if !strings.HasSuffix(out.String(), tt.want) {
@@ -120,11 +120,11 @@ func TestStatusLogin(t *testing.T) {
 func TestStatusSystemctlError(t *testing.T) {
 	dir := t.TempDir()
 	writeUnit(t, dir, "utils", "/home/a/utils")
-	runner := &fakeRunner{replies: map[string]reply{
+	runner := &fakeMachine{replies: map[string]reply{
 		isActiveCmd("utils"): {err: errors.New("systemctl not found")},
 	}}
 
-	err := (&Manager{unitDir: dir, runner: runner}).Status(&bytes.Buffer{})
+	err := (&Manager{unitDir: dir, machine: runner}).Status(&bytes.Buffer{})
 	if err == nil || !strings.Contains(err.Error(), "claude-rc-utils.service") {
 		t.Fatalf("err = %v, want it to name claude-rc-utils.service", err)
 	}

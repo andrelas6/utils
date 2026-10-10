@@ -5,7 +5,7 @@ import "os/exec"
 type Manager struct {
 	unitDir  string
 	home     string
-	runner   Runner
+	machine  machine
 	lookPath func(name string) (string, error)
 }
 
@@ -13,7 +13,7 @@ func New(unitDir, home string) *Manager {
 	return &Manager{
 		unitDir:  unitDir,
 		home:     home,
-		runner:   ExecRunner{},
+		machine:  realMachine{},
 		lookPath: exec.LookPath,
 	}
 }

@@ -12,13 +12,13 @@ import (
 
 const claudePath = "/home/a/.local/bin/claude"
 
-func newTestManager(t *testing.T) (*Manager, *fakeRunner) {
+func newTestManager(t *testing.T) (*Manager, *fakeMachine) {
 	t.Helper()
-	runner := &fakeRunner{}
+	runner := &fakeMachine{}
 	return &Manager{
 		unitDir: filepath.Join(t.TempDir(), "systemd", "user"),
 		home:    t.TempDir(),
-		runner:  runner,
+		machine: runner,
 		lookPath: func(name string) (string, error) {
 			if name != "claude" {
 				return "", errors.New("unexpected lookup " + name)
@@ -60,6 +60,7 @@ func TestAdd(t *testing.T) {
 }
 
 type outputAtFirstCall struct {
+	realMachine
 	out  *bytes.Buffer
 	seen *string
 }
@@ -77,7 +78,7 @@ func TestAddRemindsBeforeStarting(t *testing.T) {
 	svc, _ := newTestManager(t)
 	var out bytes.Buffer
 	var beforeSystemctl string
-	svc.runner = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
+	svc.machine = outputAtFirstCall{out: &out, seen: &beforeSystemctl}
 
 	if err := svc.Add(&out, t.TempDir(), "utils", false); err != nil {
 		t.Fatal(err)
