@@ -48,6 +48,8 @@ go vet ./...
 
 Before declaring work done: `go vet ./...` and `make test` pass, and `make build-linux` compiles.
 
+Every pull request runs the same checks on GitHub (`.github/workflows/checks.yml`, Ubuntu and macOS), plus `gofmt -l .` and a `claude-rc add -dry-run` / `lspm` smoke test. A red check blocks the change; fix it rather than skipping it.
+
 ## Workflow
 
 Every change goes through these skills, in order:

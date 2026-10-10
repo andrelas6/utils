@@ -1,0 +1,58 @@
+name: checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: checks-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+
+      - name: Formatting
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "These files need gofmt:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Vet
+        run: go vet ./...
+
+      - name: Tests
+        run: make test
+
+      - name: Linux build
+        run: make build-linux
+
+      - name: Smoke test
+        run: |
+          make build
+          mkdir -p "$RUNNER_TEMP/bin" "$RUNNER_TEMP/repo"
+          printf '#!/bin/sh\necho "{\\"loggedIn\\": true}"\n' > "$RUNNER_TEMP/bin/claude"
+          chmod +x "$RUNNER_TEMP/bin/claude"
+          export PATH="$RUNNER_TEMP/bin:$PATH"
+
+          ./bin/claude-rc add -dry-run "$RUNNER_TEMP/repo" | tee "$RUNNER_TEMP/add.txt"
+          grep -qF "WorkingDirectory=$RUNNER_TEMP/repo" "$RUNNER_TEMP/add.txt"
+          grep -qF "ExecStart=$RUNNER_TEMP/bin/claude remote-control --name %H-repo" "$RUNNER_TEMP/add.txt"
+          grep -qF "would run: systemctl --user enable --now claude-rc-repo.service" "$RUNNER_TEMP/add.txt"
+
+          ./bin/lspm . | grep -q "go.mod"
